@@ -21,3 +21,10 @@ python -m sim --duration 900  # headless run; logs to data/runs/<run_id>/ (use -
 python -m server              # dashboard at http://127.0.0.1:8000
 pytest -q
 ```
+
+## Dashboard
+Press **Play** to start the shared simulation; sliders change demand, vehicle mix, pedestrians and
+signal timing live. The junction opens in the **3D** view (drag to pan, wheel to zoom, Q/E or ⟲/⟳ to
+rotate, **Fit** to reset); **2D** switches to the top-down debug view. Add `?view=2d` to the URL to
+start in 2D, and press **F** for a frame-rate readout. If WebGL or the CDN is unavailable, the
+dashboard stays in 2D.

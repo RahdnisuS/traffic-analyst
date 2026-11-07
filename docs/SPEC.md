@@ -91,22 +91,21 @@ Phase 14 – Unit tests (IDM, signal logic, scenario parser, retrieval), error h
 | 2026-11-07 | 4 | Default vehicle mix: 35% car, 45% bike, 15% auto, 5% bus. Buses prefer the kerb lane when it has room. |
 | 2026-11-07 | 4 | Bike filtering uses **virtual filter lanes** along the lane dividers (plus matching exit-side gaps), not a full sub-lane model: it reuses the 1-D lane machinery. Bikes filter only when queued behind slow traffic, only for movements whose path out of the gap crosses no neighbouring lane (straight-only on the default layout), and ride at 5.5 m/s only while alongside a queue. |
 | 2026-11-07 | 4 | Pedestrians use the social force model, **elliptical specification** (Johansson, Helbing & Shukla 2007), with 0.5 s anticipation; the circular version let head-on walkers overlap. Vehicles are not force sources: walker/vehicle separation is by rules (start only on WALK with the crosswalk clear; drivers yield to anyone on it). |
+| 2026-11-07 | 4 | Diagonal crossing during the exclusive phase is not modelled (adjacent crosswalks only), which keeps the clearance interval at ~13 s instead of ~22 s. |
 | 2026-11-07 | 5 | Three.js r160 from a pinned CDN URL via an **import map**, loaded with a dynamic `import()`: still no build step, and if WebGL or the CDN fails the dashboard falls back to the 2D view. |
 | 2026-11-07 | 5 | 3D is the default view; the 2D canvas stays as the debug view (toggle, remembered per browser; `?view=2d` overrides). Only the visible view renders. |
 | 2026-11-07 | 5 | Vehicles: one `InstancedMesh` per part per type (chassis, body, cabin/canopy/window band, brake-light bar), with geometry pre-offset so the origin is the front bumper: one matrix per vehicle drives all its parts. Body colour is a stable hash of the vehicle id; type is shown by shape and livery (green autos, red/blue/orange buses). |
 | 2026-11-07 | 5 | Speed state, which the 2D view shows as colour, is shown in 3D as **brake lights** (on below the 2 m/s queue speed). |
 | 2026-11-07 | 5 | Camera: orthographic, 55° elevation, from the south-east, with 90° rotation steps (Q/E). Buildings are procedural from a fixed seed and kept low near the junction so they don't hide the stop lines. Sun ~42° high from the west-south-west; the 2048² shadow map covers the inner ±60% of the map only, for sharp shadows where people look. Dark theme = dusk lighting. |
-| 2026-11-07 | 4 | Diagonal crossing during the exclusive phase is not modelled (adjacent crosswalks only), which keeps the clearance interval at ~13 s instead of ~22 s. |
 
 ## Status
 
 - [x] Phase 1 – Core sim
 - [x] Phase 2 – Metrics and logging
 - [x] Phase 3 – Web dashboard
-- [x] Phase 4 – Mixed traffic and pedestrians (commit f1cf44f; 69 tests). Open item: the dashboard's new
-      visuals (sidewalks, walkers, walk signals, mix sliders) were verified by tests and server checks only,
-      not yet by eye in a browser.
-- [x] Phase 5 – 2.5D renderer. Verified in headless Edge (SwiftShader) at ~130–150 vehicles: desktop,
+- [x] Phase 4 – Mixed traffic and pedestrians (commit f1cf44f; 69 tests). Its dashboard visuals
+      (sidewalks, walkers, walk signals, mix sliders) were later checked in browser screenshots in Phase 5.
+- [x] Phase 5 – 2.5D renderer (commit 62c61a0; 70 tests). Verified in headless Edge (SwiftShader) at ~130–150 vehicles: desktop,
       390 px phone, light and dark themes, 2D toggle. Open item: 60 FPS on real laptop hardware is
       not yet measured (press F in the dashboard for the frame-rate readout).
 - [ ] Phase 6 – Stress test and benchmark (next)
