@@ -20,6 +20,7 @@ import csv
 import dataclasses
 import json
 import os
+import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -40,6 +41,7 @@ METRIC_DEFINITIONS = {
     "los": "HCM Level of Service from mean control delay: A<=10s B<=20 C<=35 D<=55 E<=80 F>80",
     "queue_spike": "episode while an approach has >= queue_spike_on queued vehicles (ends at <= queue_spike_off)",
     "spillback": "episode while a lane's queue tail is beyond spillback_on_frac of the lane length",
+    "config_change": "a setting changed mid-run (e.g. a dashboard slider); 'changes' lists the new values",
     "gridlock": "episode while no vehicle has exited for gridlock_window_s and >= gridlock_stopped_frac are stopped",
     "wait_<arm>": "mean accumulated wait of vehicles currently on that approach's inbound lanes",
 }
@@ -74,10 +76,14 @@ class RunLogger:
     """
 
     def __init__(self, sim, controller: str = "fixed", runs_dir: str | Path | None = None,
-                 run_id: str | None = None, tags: dict | None = None):
+                 run_id: str | None = None, tags: dict | None = None,
+                 collector: MetricsCollector | None = None, attach: bool = True):
+        """``attach=False``: the caller (e.g. the dashboard session, which also streams the
+        same rows to browsers) drives the collector and passes results to ``record()``."""
         self.sim = sim
         cfg = sim.cfg
-        self.collector = MetricsCollector(sim, cfg.metrics)
+        self.collector = collector or MetricsCollector(sim, cfg.metrics)
+        self._attached = attach
         base = Path(runs_dir) if runs_dir is not None else cfg.runs_path()
         base.mkdir(parents=True, exist_ok=True)
         now = datetime.now(timezone.utc)
@@ -113,7 +119,8 @@ class RunLogger:
                                      fieldnames=[f.name for f in dataclasses.fields(TripRecord)])
         self._trips.writeheader()
         self.closed = False
-        sim.observers.append(self)
+        if attach:
+            sim.observers.append(self)
 
     @staticmethod
     def _unique_id(base: Path, stem: str) -> str:
@@ -124,7 +131,9 @@ class RunLogger:
 
     # ------------------------------------------------------------------ observer
     def after_step(self, sim) -> None:
-        row, events, trips = self.collector.after_step(sim)
+        self.record(*self.collector.after_step(sim))
+
+    def record(self, row: dict | None, events: list[dict], trips: list[TripRecord]) -> None:
         self._write_events(events)
         for tr in trips:
             self._trips.writerow(dataclasses.asdict(tr))
@@ -152,6 +161,16 @@ class RunLogger:
         _write_json_atomic(self.dir / "manifest.json", self.manifest)
         self.closed = True
         return self.manifest
+
+    def discard(self) -> None:
+        """Delete this run's directory (used for trivially short dashboard runs, e.g. a
+        reset two seconds after starting), so data/runs/ isn't cluttered with noise."""
+        for fh in (self._metrics_fh, self._events_fh, self._trips_fh):
+            fh.close()
+        if self in self.sim.observers:
+            self.sim.observers.remove(self)
+        shutil.rmtree(self.dir, ignore_errors=True)
+        self.closed = True
 
     def __enter__(self) -> "RunLogger":
         return self

@@ -117,6 +117,7 @@ class MetricsCollector:
         self._prev_arrivals = dict(sim.spawner.arrivals_total)
         self._trip_window: deque[tuple[float, float]] = deque()  # (exit_time, delay)
         self._sig_idx = 0
+        self._ctl_idx = len(sim.control_events)
         self._last_green: dict[str, float | None] = {a: None for a in self.arms}
         self._episodes: dict[tuple[str, str], _Episode] = {}
         self._next_event_id = 0
@@ -156,6 +157,11 @@ class MetricsCollector:
                 for arm in self.phase_arms[pe.phase]:
                     self._last_green[arm] = pe.time
             events.append(self._event("phase_change", pe.time, {"phase": pe.phase, "stage": pe.stage}))
+        new_ctl = sim.control_events[self._ctl_idx:]
+        self._ctl_idx = len(sim.control_events)
+        for ce in new_ctl:
+            events.append(self._event("config_change", ce["t"],
+                                      {"source": ce["source"], "changes": ce["changes"]}))
 
         row = None
         if sim.tick % self.steps_per_sample == 0:

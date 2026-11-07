@@ -7,6 +7,24 @@ from dataclasses import dataclass
 from .config import VehicleTypeParams
 
 
+def scale_for_aggressiveness(p: VehicleTypeParams, aggressiveness: float) -> VehicleTypeParams:
+    """Map one 0..1 slider onto the IDM parameters that describe driving style.
+
+    f = 2*(aggressiveness - 0.5) runs from -1 (timid) to +1 (aggressive); 0 is the baseline.
+    Aggressive drivers keep shorter time gaps (T), smaller standstill gaps (s0), accelerate and
+    brake harder, and want to go a little faster. Shorter headways raise junction capacity
+    but leave less safety margin, which is the trade-off the slider lets you explore.
+    """
+    f = 2.0 * (aggressiveness - 0.5)
+    return p.model_copy(update={
+        "time_headway": p.time_headway * (1 - 0.35 * f),
+        "min_gap": p.min_gap * (1 - 0.4 * f),
+        "max_accel": p.max_accel * (1 + 0.4 * f),
+        "comfort_decel": p.comfort_decel * (1 + 0.25 * f),
+        "desired_speed": p.desired_speed * (1 + 0.1 * f),
+    })
+
+
 @dataclass(slots=True, eq=False)
 class Vehicle:
     id: int

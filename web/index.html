@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Traffic Analyst</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Chart.js is the only external script (pinned version). The sim view works without it. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Traffic Analyst</h1>
+    <span id="conn" class="conn" role="status" aria-live="polite">Connecting…</span>
+  </header>
+
+  <main class="layout">
+    <section class="view card" aria-label="Junction view (2D)">
+      <canvas id="view2d" aria-label="Top-down junction simulation"></canvas>
+      <div class="hud" aria-live="off">
+        <span id="hud-clock" class="hud-clock">0:00</span>
+        <span id="hud-phase" class="hud-phase">–</span>
+      </div>
+      <div class="view-tools">
+        <button id="zoom-in" class="icon-btn" aria-label="Zoom in">+</button>
+        <button id="zoom-out" class="icon-btn" aria-label="Zoom out">−</button>
+        <button id="zoom-fit" class="icon-btn" aria-label="Fit junction to view">Fit</button>
+      </div>
+      <ul class="view-legend" aria-label="Vehicle colour key">
+        <li><i class="sw sw-moving"></i>Moving</li>
+        <li><i class="sw sw-queued"></i>Queued (&lt;2 m/s)</li>
+        <li><i class="sw sw-stopped"></i>Stopped</li>
+      </ul>
+    </section>
+
+    <aside class="side">
+      <section class="card controls" aria-label="Simulation controls">
+        <div class="row">
+          <button id="btn-play" class="btn primary" aria-pressed="false">Play</button>
+          <button id="btn-reset" class="btn">Reset</button>
+          <label class="seed">Seed <input id="seed" type="number" min="0" step="1" value="42" inputmode="numeric"></label>
+        </div>
+        <div class="row">
+          <span class="label" id="speed-label">Speed</span>
+          <div id="speeds" class="segmented" role="group" aria-labelledby="speed-label"></div>
+        </div>
+        <div class="slider">
+          <label for="sl-volume">Traffic volume <output id="out-volume" for="sl-volume"></output></label>
+          <input id="sl-volume" type="range" min="0" max="1500" step="25">
+        </div>
+        <div class="slider">
+          <label for="sl-aggr">Driver aggressiveness <output id="out-aggr" for="sl-aggr"></output></label>
+          <input id="sl-aggr" type="range" min="0" max="1" step="0.05">
+        </div>
+        <div class="slider">
+          <label for="sl-green">Green time per phase <output id="out-green" for="sl-green"></output></label>
+          <input id="sl-green" type="range" min="7" max="90" step="1">
+        </div>
+      </section>
+
+      <section class="kpis" aria-label="Live metrics">
+        <div class="kpi"><span class="kpi-label">Sim time</span><span id="kpi-clock" class="kpi-value">0:00</span></div>
+        <div class="kpi"><span class="kpi-label">Vehicles</span><span id="kpi-veh" class="kpi-value">0</span><span id="kpi-backlog" class="kpi-sub"></span></div>
+        <div class="kpi"><span class="kpi-label">Throughput</span><span id="kpi-thru" class="kpi-value">–</span><span class="kpi-sub">veh/h, last 2 min</span></div>
+        <div class="kpi"><span class="kpi-label">Mean delay</span><span id="kpi-delay" class="kpi-value">–</span><span id="kpi-los" class="los-badge" hidden></span></div>
+      </section>
+
+      <section class="card chart-card">
+        <h2>Queued vehicles by approach</h2>
+        <div class="chart-box"><canvas id="ch-queue" role="img" aria-label="Line chart of queued vehicles per approach over the last 5 minutes"></canvas></div>
+      </section>
+      <section class="card chart-card">
+        <h2>Mean control delay, rolling 2 min (s)</h2>
+        <div class="chart-box"><canvas id="ch-delay" role="img" aria-label="Line chart of mean control delay over the last 5 minutes"></canvas></div>
+      </section>
+      <section class="card">
+        <h2>Events</h2>
+        <ol id="events" class="events" aria-live="polite"></ol>
+      </section>
+    </aside>
+  </main>
+  <div id="toast" class="toast" role="alert" hidden></div>
+</body>
+</html>

@@ -68,6 +68,12 @@ class DemandSettings(_Strict):
         return self
 
 
+class DriverSettings(_Strict):
+    # 0 = timid, 0.5 = the vehicle_types baseline, 1 = aggressive. Applied to newly spawned
+    # drivers only; people already on the road keep their personality.
+    aggressiveness: float = Field(0.5, ge=0, le=1)
+
+
 class SignalSettings(_Strict):
     controller: Literal["fixed"] = "fixed"
     green_s: float | list[float] = 25.0
@@ -122,6 +128,7 @@ class Config(_Strict):
     sim: SimSettings = SimSettings()
     vehicle_types: dict[str, VehicleTypeParams]
     demand: DemandSettings
+    driver: DriverSettings = DriverSettings()
     signals: SignalSettings = SignalSettings()
     intersection: IntersectionSettings = IntersectionSettings()
     metrics: MetricsSettings = MetricsSettings()

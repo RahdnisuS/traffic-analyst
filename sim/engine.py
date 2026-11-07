@@ -29,12 +29,12 @@ from enum import Enum
 
 import numpy as np
 
-from .config import Config
+from .config import Config, VehicleTypeParams
 from .idm import ballistic_step, idm_acceleration
 from .junction import Junction
 from .signals import FixedTimePolicy, SignalController, SignalPolicy
 from .spawner import PendingVehicle, Spawner
-from .vehicle import TripRecord, Vehicle
+from .vehicle import TripRecord, Vehicle, scale_for_aggressiveness
 
 WAIT_SPEED = 0.1      # m/s; below this a vehicle counts as "waiting" (same threshold as SUMO)
 STOP_BUFFER = 1.0     # virtual red-light obstacle sits this far past the stop line, so the
@@ -64,6 +64,8 @@ class RunCounters:
 class Simulation:
     def __init__(self, config: Config, seed: int | None = None,
                  junction: Junction | None = None, policy: SignalPolicy | None = None):
+        # Deep copy: live setting changes (sliders) must not leak into other sims sharing a config.
+        config = config.model_copy(deep=True)
         self.cfg = config
         self.dt = config.sim.dt
         self.seed = config.sim.seed if seed is None else seed
@@ -86,6 +88,61 @@ class Simulation:
         # Observer pattern: anything with ``after_step(sim)`` (metrics, logger, websocket
         # streamer) can watch the sim without the sim knowing what it is.
         self.observers: list = []
+        # Settings changes made while running (sliders, analyst scenarios). Logged as events so
+        # the analyst can say "wait rose after you raised volume at 3:40".
+        self.control_events: list[dict] = []
+        self._base_vph = dict(config.demand.per_approach_vph)
+        self._params_cache: dict[str, VehicleTypeParams] = {}
+        self._refresh_params()
+
+    def _refresh_params(self) -> None:
+        agg = self.cfg.driver.aggressiveness
+        self._params_cache = {name: scale_for_aggressiveness(p, agg)
+                              for name, p in self.cfg.vehicle_types.items()}
+
+    # ================================================================== live settings
+    def apply_settings(self, *, volume_vph: float | None = None, aggressiveness: float | None = None,
+                       green_s: float | None = None, source: str = "user") -> dict:
+        """Change settings mid-run. Returns the changes that were applied.
+
+        volume_vph: mean demand per approach; per-approach ratios from the config are kept
+                    (so a busier N-S corridor stays busier).
+        green_s:    green time for every phase of the fixed-time plan (from the next switch).
+        Raises ValueError on invalid values, leaving the sim unchanged.
+        """
+        changes: dict = {}
+        if green_s is not None:
+            if not hasattr(self.policy, "green_times"):
+                raise ValueError("the active signal policy has no adjustable green time")
+            if green_s < self.cfg.signals.min_green_s:
+                raise ValueError(f"green_s must be >= min_green_s ({self.cfg.signals.min_green_s})")
+        if aggressiveness is not None and not 0.0 <= aggressiveness <= 1.0:
+            raise ValueError("aggressiveness must be in [0, 1]")
+        if volume_vph is not None and volume_vph < 0:
+            raise ValueError("volume_vph must be >= 0")
+
+        if volume_vph is not None:
+            base_mean = sum(self._base_vph.values()) / max(len(self._base_vph), 1)
+            new = {a: round(v * volume_vph / base_mean, 1) if base_mean > 0 else float(volume_vph)
+                   for a, v in self._base_vph.items()}
+            self.cfg.demand.per_approach_vph = new
+            self.spawner.set_demand(self.cfg.demand)
+            changes["per_approach_vph"] = new
+        if aggressiveness is not None:
+            self.cfg.driver.aggressiveness = float(aggressiveness)
+            self._refresh_params()
+            changes["aggressiveness"] = float(aggressiveness)
+        if green_s is not None:
+            self.policy.green_times = [float(green_s)] * len(self.junction.phases)
+            self.cfg.signals.green_s = float(green_s)
+            changes["green_s"] = float(green_s)
+        if changes:
+            self.control_events.append({"t": round(self.time, 1), "source": source, "changes": changes})
+        return changes
+
+    def mean_volume_vph(self) -> float:
+        v = self.cfg.demand.per_approach_vph
+        return sum(v.values()) / max(len(v), 1)
 
     @property
     def time(self) -> float:
@@ -122,7 +179,7 @@ class Simulation:
                 queue.popleft()
 
     def _try_insert(self, arm: str, pv: PendingVehicle) -> bool:
-        params = self.cfg.vehicle_types[pv.vtype]
+        params = self._params_cache[pv.vtype]
         candidates = self.junction.lanes_for_movement[(arm, pv.movement)]
         # Drivers pick the allowed lane with the most free road (ties: lower index).
         lane_id = max(candidates, key=lambda lid: (self._entry_space(lid), -candidates.index(lid)))

@@ -59,3 +59,28 @@ def test_light_demand_is_fully_served(cfg):
     s = sim.summary()
     assert s["backlog"] == 0
     assert s["completed"] / s["spawned"] > 0.9
+
+
+def test_aggressiveness_baseline_is_identity_and_aggressive_raises_capacity(cfg):
+    from sim.vehicle import scale_for_aggressiveness
+    car = cfg.vehicle_types["car"]
+    assert scale_for_aggressiveness(car, 0.5) == car
+    assert scale_for_aggressiveness(car, 1.0).time_headway < car.time_headway
+
+    def served(aggr):
+        s = Simulation(cfg, seed=8)
+        s.apply_settings(volume_vph=900, aggressiveness=aggr)
+        s.run(900)
+        return s.counters.completed
+    assert served(1.0) > served(0.0)  # shorter headways discharge queues faster
+
+
+def test_apply_settings_validates_and_logs(cfg):
+    s = Simulation(cfg, seed=1)
+    with pytest.raises(ValueError):
+        s.apply_settings(green_s=2)
+    assert s.control_events == []
+    s.apply_settings(green_s=40, source="test")
+    assert s.policy.green_times == [40.0] * 4
+    assert s.control_events[-1]["changes"] == {"green_s": 40.0}
+    assert cfg.signals.green_s == 25  # the shared config was not mutated
