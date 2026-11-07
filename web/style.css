@@ -76,10 +76,18 @@ h2 { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--ink-2); }
 .view { position: sticky; top: 16px; padding: 0; overflow: hidden;
   aspect-ratio: 1 / 1; max-height: calc(100vh - 90px); width: 100%; justify-self: center; }
 .view canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.view canvas[hidden] { display: none; }
+.view canvas:active { cursor: grabbing; }
 .hud { position: absolute; top: 10px; left: 10px; display: flex; gap: 8px; pointer-events: none; }
 .hud span { background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
   padding: 3px 8px; font-variant-numeric: tabular-nums; font-weight: 600; }
-.view-tools { position: absolute; top: 10px; right: 10px; display: flex; gap: 4px; }
+.view-tools { position: absolute; top: 10px; right: 10px; display: flex; gap: 4px; flex-wrap: wrap;
+  justify-content: flex-end; max-width: calc(100% - 20px); }
+.view-tools .segmented { margin-right: 4px; }
+.view-tools .segmented button { min-height: 32px; padding: 4px 10px; font-weight: 600; }
+.view-tools button[disabled] { opacity: 0.45; cursor: not-allowed; }
+.view-tools [hidden] { display: none; }
+.hud-fps { font-weight: 500 !important; color: var(--ink-2); }
 .view-legend { position: absolute; bottom: 8px; left: 10px; margin: 0; padding: 4px 8px; list-style: none;
   display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--ink-2);
   background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
@@ -89,6 +97,11 @@ h2 { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--ink-2); }
 .sw-queued { background: var(--veh-queued); }
 .sw-stopped { background: var(--veh-stopped); }
 .sw-ped { background: var(--ped); border-radius: 50%; }
+.sw-brake { background: #ff2a2a; box-shadow: 0 0 6px #ff2a2a; }
+.sw-auto { background: #2f8f3e; }
+.sw-bus { background: #c8432f; }
+.view-legend .hint { color: var(--muted); }
+.view-legend[hidden] { display: none; }
 
 .side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
@@ -144,6 +157,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 @media (max-width: 900px) {
   .layout { grid-template-columns: minmax(0, 1fr); }
   .view { position: relative; top: 0; max-height: none; }
+}
+@media (max-width: 560px) {
+  /* Phones: the controls row would cover the HUD, so it moves under it. */
+  .view-tools { top: 46px; }
+  .view-legend .hint { display: none; }
 }
 @media (max-width: 420px) {
   .layout { padding: 12px 16px; gap: 12px; }

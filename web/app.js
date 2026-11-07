@@ -7,7 +7,12 @@ import { Charts } from "./charts.js";
 
 const $ = (id) => document.getElementById(id);
 const frames = new FrameBuffer();
-const renderer = new Renderer2D($("view2d"));
+// Two interchangeable views fed by the same interpolated frames. Only the visible one draws,
+// so the hidden view costs nothing. The 3D view loads lazily (see load3D).
+const views = { "2d": new Renderer2D($("view2d")), "3d": null };
+let mode = "2d";
+let layoutArgs = null; // last init's layout, replayed into the 3D view if it loads later
+const active = () => views[mode];
 const charts = new Charts($("ch-queue"), $("ch-delay"));
 const state = { limits: null, playing: false, speed: 1, ws: null, retry: 0, types: [] };
 const MAX_EVENTS = 80;
@@ -43,8 +48,8 @@ function handle(msg) {
   switch (msg.type) {
     case "init":
       state.limits = msg.limits;
-      renderer.setLayout(msg.layout, msg.vehicle_types.map((t) => msg.vehicle_dims[t]),
-                         msg.vehicle_types, msg.ped_radius);
+      layoutArgs = [msg.layout, msg.vehicle_types.map((t) => msg.vehicle_dims[t]), msg.vehicle_types, msg.ped_radius];
+      for (const v of Object.values(views)) v?.setLayout(...layoutArgs);
       buildMix(msg.vehicle_types);
       frames.clear();
       charts.reset(msg.history);
@@ -265,15 +270,64 @@ $("btn-reset").onclick = () => {
   const seed = Number.parseInt($("seed").value, 10);
   send({ cmd: "reset", seed: Number.isFinite(seed) && seed >= 0 ? seed : null });
 };
-$("zoom-in").onclick = () => renderer.zoomBy(1.4);
-$("zoom-out").onclick = () => renderer.zoomBy(1 / 1.4);
-$("zoom-fit").onclick = () => renderer.fit();
+$("zoom-in").onclick = () => active().zoomBy(1.4);
+$("zoom-out").onclick = () => active().zoomBy(1 / 1.4);
+$("zoom-fit").onclick = () => active().fit();
+$("rot-l").onclick = () => views["3d"]?.rotate(-Math.PI / 2);
+$("rot-r").onclick = () => views["3d"]?.rotate(Math.PI / 2);
+$("mode-2d").onclick = () => setMode("2d");
+$("mode-3d").onclick = () => setMode("3d");
 document.addEventListener("keydown", (e) => {
-  if (e.code === "Space" && !["INPUT", "BUTTON"].includes(document.activeElement.tagName)) {
+  if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+  if (e.code === "Space" && document.activeElement.tagName !== "BUTTON") {
     e.preventDefault();
     send({ cmd: state.playing ? "pause" : "play" });
+  } else if (mode === "3d" && (e.code === "KeyQ" || e.code === "KeyE")) {
+    views["3d"].rotate(e.code === "KeyQ" ? -Math.PI / 2 : Math.PI / 2);
+  } else if (e.code === "KeyF") {
+    $("hud-fps").hidden = !$("hud-fps").hidden; // frame-rate readout, for checking performance
   }
 });
+
+// ------------------------------------------------------------------ view mode
+const store = {
+  // Remembered view choice. Storage can be blocked (private mode), so failures are ignored.
+  get: () => { try { return localStorage.getItem("view-mode"); } catch { return null; } },
+  set: (v) => { try { localStorage.setItem("view-mode", v); } catch { /* not essential */ } },
+};
+
+function setMode(m) {
+  if (m === "3d" && !views["3d"]) return;
+  mode = m;
+  $("view3d").hidden = m !== "3d";
+  $("view2d").hidden = m !== "2d";
+  $("legend-3d").hidden = m !== "3d";
+  $("legend-2d").hidden = m !== "2d";
+  for (const b of document.querySelectorAll(".only-3d")) b.hidden = m !== "3d";
+  $("mode-3d").setAttribute("aria-pressed", String(m === "3d"));
+  $("mode-2d").setAttribute("aria-pressed", String(m === "2d"));
+  store.set(m);
+}
+
+/**
+ * Load Three.js and the 3D renderer on demand. A dynamic import means a CDN outage or a
+ * browser without WebGL only costs the 3D view: the dashboard keeps running in 2D.
+ */
+async function load3D() {
+  try {
+    const { Renderer3D } = await import("./render3d.js");
+    views["3d"] = new Renderer3D($("view3d"));
+    if (layoutArgs) views["3d"].setLayout(...layoutArgs);
+    $("mode-3d").disabled = false;
+    // 3D is the default; 2D is the debug view. ?view=2d|3d in the URL overrides the remembered choice.
+    const wanted = new URLSearchParams(location.search).get("view") ?? store.get();
+    if (wanted !== "2d") setMode("3d");
+  } catch (err) {
+    console.warn("3D view unavailable:", err);
+    $("mode-3d").title = "3D view unavailable (WebGL or Three.js failed to load)";
+    toast("3D view unavailable here, showing the 2D view.");
+  }
+}
 
 let toastTimer;
 function toast(text) {
@@ -287,11 +341,19 @@ function toast(text) {
 function clock(t) { const s = Math.max(0, Math.floor(t)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
 
 // ------------------------------------------------------------------ render loop
+const fps = { last: 0, avg: 60, shown: 0 };
 function loop(now) {
-  renderer.draw(frames.cur, frames.sample(now), frames.samplePeds(now), now);
+  active().draw(frames.cur, frames.sample(now), frames.samplePeds(now), now);
+  if (fps.last) fps.avg = 0.95 * fps.avg + 0.05 * (1000 / Math.max(now - fps.last, 1));
+  fps.last = now;
+  if (!$("hud-fps").hidden && now - fps.shown > 500) {
+    fps.shown = now;
+    $("hud-fps").textContent = `${Math.round(fps.avg)} fps · ${frames.cur?.vehicles.length ?? 0} veh`;
+  }
   requestAnimationFrame(loop);
 }
 
 addEvents([]);
 connect();
+load3D();
 requestAnimationFrame(loop);

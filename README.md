@@ -9,6 +9,8 @@ Work in progress. The full README (architecture diagram, results, learnings) com
 - [x] Phase 3: FastAPI + WebSocket dashboard (20 Hz stream, 2D canvas, sliders, live charts, mobile layout)
 - [x] Phase 4: mixed Indian traffic (cars, bikes, autos, buses; bikes filter between lanes) and social-force
       pedestrians with an exclusive, on-demand pedestrian phase
+- [x] Phase 5: 2.5D Three.js view (orthographic tilted camera, low-poly instanced vehicles, capsule
+      pedestrians, procedural buildings, glowing signals, soft shadows) with a toggle back to the 2D view
 
 ## Quick start
 ```bash

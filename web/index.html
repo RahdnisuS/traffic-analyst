@@ -5,8 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Traffic Analyst</title>
   <link rel="stylesheet" href="style.css">
-  <!-- Chart.js is the only external script (pinned version). The sim view works without it. -->
+  <!-- External scripts are pinned versions. Chart.js draws the charts; Three.js (loaded lazily by
+       app.js through this import map) draws the 2.5D view. Without either, the 2D view still works. -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  </script>
   <script type="module" src="app.js"></script>
 </head>
 <body>
@@ -16,22 +20,36 @@
   </header>
 
   <main class="layout">
-    <section class="view card" aria-label="Junction view (2D)">
+    <section id="view" class="view card" aria-label="Junction view">
+      <canvas id="view3d" aria-label="2.5D junction simulation" hidden></canvas>
       <canvas id="view2d" aria-label="Top-down junction simulation"></canvas>
       <div class="hud" aria-live="off">
         <span id="hud-clock" class="hud-clock">0:00</span>
         <span id="hud-phase" class="hud-phase">–</span>
+        <span id="hud-fps" class="hud-fps" hidden></span>
       </div>
       <div class="view-tools">
+        <div class="segmented" role="group" aria-label="View mode">
+          <button id="mode-3d" aria-pressed="false" disabled>3D</button>
+          <button id="mode-2d" aria-pressed="true">2D</button>
+        </div>
+        <button id="rot-l" class="icon-btn only-3d" aria-label="Rotate view left" hidden>⟲</button>
+        <button id="rot-r" class="icon-btn only-3d" aria-label="Rotate view right" hidden>⟳</button>
         <button id="zoom-in" class="icon-btn" aria-label="Zoom in">+</button>
         <button id="zoom-out" class="icon-btn" aria-label="Zoom out">−</button>
-        <button id="zoom-fit" class="icon-btn" aria-label="Fit junction to view">Fit</button>
+        <button id="zoom-fit" class="icon-btn" aria-label="Reset view">Fit</button>
       </div>
-      <ul class="view-legend" aria-label="Vehicle colour key">
+      <ul id="legend-2d" class="view-legend" aria-label="Vehicle colour key">
         <li><i class="sw sw-moving"></i>Moving</li>
         <li><i class="sw sw-queued"></i>Queued (&lt;2 m/s)</li>
         <li><i class="sw sw-stopped"></i>Stopped</li>
         <li><i class="sw sw-ped"></i>Pedestrian</li>
+      </ul>
+      <ul id="legend-3d" class="view-legend" aria-label="3D view key" hidden>
+        <li><i class="sw sw-brake"></i>Brake lights: queued (&lt;2 m/s)</li>
+        <li><i class="sw sw-auto"></i>Auto</li>
+        <li><i class="sw sw-bus"></i>Bus</li>
+        <li class="hint">Drag to pan · wheel to zoom · Q/E rotate</li>
       </ul>
     </section>
 

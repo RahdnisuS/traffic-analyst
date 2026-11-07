@@ -4,6 +4,8 @@
 // states. World units are metres with y pointing north; one canvas transform maps world to
 // screen, so all drawing code below works in metres.
 
+import { armGeometry, dividerPairs, layoutExtent, signalSpot, ARM_DIR } from "./geometry.js";
+
 const QUEUE_SPEED = 2.0;  // matches metrics.queue_speed
 const STOP_SPEED = 0.1;   // matches the engine's WAIT_SPEED
 const PED_MIN_PX = 2.4;   // pedestrians are 0.5 m wide: at "fit" zoom that is under a pixel, so
@@ -42,10 +44,8 @@ export class Renderer2D {
     this.dims = vehicleDims;
     this.types = vehicleTypes;
     this.pedRadius = pedRadius;
-    let ext = 0;
-    for (const e of Object.values(layout.edges)) for (const [x, y] of e.points) ext = Math.max(ext, Math.abs(x), Math.abs(y));
-    this.extent = ext;
-    this.arms = this.#armGeometry(layout);
+    this.extent = layoutExtent(layout);
+    this.arms = armGeometry(layout);
   }
 
   resize() {
@@ -82,24 +82,6 @@ export class Renderer2D {
       e.preventDefault();
       this.zoomBy(e.deltaY < 0 ? 1.15 : 1 / 1.15);
     }, { passive: false });
-  }
-
-  /** Per-arm road extents, derived from lane polylines (so any JSON layout renders). */
-  #armGeometry(layout) {
-    const arms = {};
-    const w = layout.lane_width;
-    for (const e of Object.values(layout.edges)) {
-      if (e.kind === "connector") continue;
-      const a = (arms[e.arm] ??= { lat: [Infinity, -Infinity], inbound: [] });
-      const vertical = e.arm === "N" || e.arm === "S";
-      for (const [x, y] of e.points) {
-        const lat = vertical ? x : y;
-        a.lat[0] = Math.min(a.lat[0], lat - w / 2);
-        a.lat[1] = Math.max(a.lat[1], lat + w / 2);
-      }
-      if (e.kind === "inbound") a.inbound.push(e);
-    }
-    return arms;
   }
 
   draw(frame, vehicles, peds = [], now = 0) {
@@ -197,27 +179,17 @@ export class Renderer2D {
     ctx.lineWidth = 0.15;
     ctx.strokeStyle = this.c.marking;
     ctx.setLineDash([3, 3]);
-    const groups = {};
-    for (const [id, e] of Object.entries(L.edges)) {
-      // Filter lanes (flt_*, oflt_*) run along the dividers themselves: no extra markings.
-      if (e.kind === "connector" || e.kind === "filter" || id.startsWith("oflt_")) continue;
-      (groups[`${e.kind}_${e.arm}`] ??= []).push([Number(id.split("_").pop()), e]);
-    }
-    for (const lanes of Object.values(groups)) {
-      lanes.sort((a, b) => a[0] - b[0]);
-      for (let i = 0; i + 1 < lanes.length; i++) {
-        const p = lanes[i][1].points, q = lanes[i + 1][1].points;
-        ctx.beginPath();
-        ctx.moveTo((p[0][0] + q[0][0]) / 2, (p[0][1] + q[0][1]) / 2);
-        ctx.lineTo((p.at(-1)[0] + q.at(-1)[0]) / 2, (p.at(-1)[1] + q.at(-1)[1]) / 2);
-        ctx.stroke();
-      }
+    for (const [p, q] of dividerPairs(L)) {
+      ctx.beginPath();
+      ctx.moveTo(...p);
+      ctx.lineTo(...q);
+      ctx.stroke();
     }
     ctx.setLineDash([]);
     ctx.strokeStyle = this.c.median;
     ctx.lineWidth = 0.3;
     for (const arm of Object.keys(this.arms)) {
-      const u = { N: [0, 1], E: [1, 0], S: [0, -1], W: [-1, 0] }[arm];
+      const u = ARM_DIR[arm];
       ctx.beginPath();
       ctx.moveTo(u[0] * S, u[1] * S);
       ctx.lineTo(u[0] * this.extent, u[1] * this.extent);
@@ -255,16 +227,12 @@ export class Renderer2D {
   #drawSignals(signals) {
     if (!signals) return;
     const { ctx } = this;
-    const w = this.layout.lane_width;
     const colors = { G: "#22c55e", Y: "#f5b301", R: "#e5484d" };
     for (const [arm, g] of Object.entries(this.arms)) {
-      const kerb = g.inbound.find((e) => e.points) && g.inbound[0];
-      if (!kerb) continue;
       // Signal head on the kerb side (driver's left in left-hand traffic), at the stop line.
-      const p = kerb.points, a = p.at(-2), b = p.at(-1);
-      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
-      const lx = -(b[1] - a[1]) / len, ly = (b[0] - a[0]) / len;
-      const x = b[0] + lx * (w / 2 + 1.6), y = b[1] + ly * (w / 2 + 1.6);
+      const spot = signalSpot(this.layout, g);
+      if (!spot) continue;
+      const { x, y } = spot;
       ctx.fillStyle = "#1b1b1b";
       ctx.beginPath(); ctx.arc(x, y, 1.6, 0, 2 * Math.PI); ctx.fill();
       ctx.fillStyle = colors[signals[arm]] || "#777";

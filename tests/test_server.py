@@ -34,6 +34,16 @@ def test_dashboard_page_served(client):
     assert r.status_code == 200 and "Traffic Analyst" in r.text
 
 
+def test_3d_view_assets_served(client):
+    """The 2.5D view is plain static JS: page wires the import map, modules are served as JS."""
+    page = client.get("/").text
+    assert '"three": "https://cdn.jsdelivr.net/npm/three@0.160.0/' in page  # pinned version
+    assert 'id="view3d"' in page and 'id="mode-2d"' in page
+    for name in ("render3d.js", "geometry.js", "render2d.js", "interp.js"):
+        r = client.get(f"/{name}")
+        assert r.status_code == 200 and "javascript" in r.headers["content-type"]
+
+
 def test_run_id_path_traversal_rejected(client):
     assert client.get("/api/runs/..%2F..%2Fetc").status_code in (400, 404)
     assert client.get("/api/runs/not_a_run").status_code == 404
