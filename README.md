@@ -18,6 +18,7 @@ Work in progress. The full README (architecture diagram, results, learnings) com
 ```bash
 python -m venv .venv
 .venv/Scripts/activate        # Windows (use `source .venv/bin/activate` on macOS/Linux)
+pip install torch --index-url https://download.pytorch.org/whl/cpu   # CPU-only PyTorch: much smaller
 pip install -r requirements.txt
 python -m sim --duration 900  # headless run; logs to data/runs/<run_id>/ (use --no-log to skip)
 python -m server              # dashboard at http://127.0.0.1:8000
@@ -48,3 +49,23 @@ queue grows without limit. The junction never literally gridlocks, because drive
 box without room to leave it; the overflow queues outside instead. The **Run stress test** button
 in the dashboard runs a quicker version on the live simulation to *show* the breakdown; its short
 steps only catch clear overload, so the benchmark is the number to quote.
+
+## RL signal controller
+An AI agent decides, every 5 seconds, whether to keep the current green or switch to the next
+phase. It is trained with reinforcement learning (MaskablePPO, Stable-Baselines3) on randomised
+traffic, and rewarded for reducing the total time vehicles spend waiting. It can only *request* a
+switch: minimum green, amber, all-red and the pedestrian phase are still enforced by the signal
+controller, so a badly trained agent can be slow but never unsafe. Every decision is logged
+(what it saw, what it chose, how confident it was) to `decisions.jsonl` in the run log, so the
+analyst can later explain why it switched.
+
+**Status: code and tests done, model not trained yet.** Train and evaluate it with:
+
+```bash
+python -m rl.train      # ~20 min on 14 cores -> rl/models/ppo_signal.zip + training curve
+python -m rl.evaluate   # vs the fixed timer on held-out seeds at low/medium/high demand
+```
+
+The training curve is drawn against two baselines on the same traffic: the fixed timer and a
+simple "gap-out" rule (switch once the green's queue has cleared, ~15% better than the fixed
+timer). An interrupted run had already passed the fixed timer at 111k of 300k decisions.

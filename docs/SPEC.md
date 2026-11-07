@@ -124,7 +124,7 @@ Phase 14 – Unit tests (IDM, signal logic, scenario parser, retrieval), error h
 - [x] Phase 6 – Stress test and benchmark (90 tests). Capacity of the default junction (fixed time, 25 s
       green): **1,790 ± 54 veh/h** over seeds 1–3 (after the collision fix); breakdown at 500 veh/h per
       approach; peak under overload ~2,070 veh/h. Live stress test checked in the browser.
-- [~] Phase 7 – RL signal controller: code, tests (102) and docs committed. Open: run the full training
+- [~] Phase 7 – RL signal controller: code, tests (102) and docs committed (commit bc5fb1a). Open: run the full training
       (`python -m rl.train`, ~20 min) and the evaluation (`python -m rl.evaluate`); stopped by the user at
       115k of 300k decisions (training return −180 vs fixed timer −179 at that point), so no model is saved yet.
 - [ ] Phase 8 – AI in the UI
