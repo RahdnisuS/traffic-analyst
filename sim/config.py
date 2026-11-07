@@ -79,7 +79,7 @@ class DriverSettings(_Strict):
 
 
 class SignalSettings(_Strict):
-    controller: Literal["fixed"] = "fixed"
+    controller: Literal["fixed", "rl"] = "fixed"  # "rl" needs a trained model (python -m rl.train)
     green_s: float | list[float] = 25.0
     amber_s: float = Field(3.0, ge=0)
     all_red_s: float = Field(2.0, ge=0)
@@ -181,6 +181,46 @@ class BenchmarkSettings(_Strict):
         return self
 
 
+class PPOSettings(_Strict):
+    """Stable-Baselines3 PPO hyperparameters (their documented defaults unless noted)."""
+    learning_rate: float = Field(3e-4, gt=0)
+    n_steps: int = Field(256, ge=8)        # decisions per env per rollout (x n_envs = batch collected)
+    batch_size: int = Field(256, ge=8)
+    n_epochs: int = Field(10, ge=1)
+    gamma: float = Field(0.99, gt=0, le=1)
+    gae_lambda: float = Field(0.95, gt=0, le=1)
+    clip_range: float = Field(0.2, gt=0)
+    ent_coef: float = Field(0.01, ge=0)
+    net_arch: list[int] = Field(default_factory=lambda: [64, 64])
+
+
+class RLSettings(_Strict):
+    """Phase 7: PPO signal controller. See the rl section of config.yaml for the reasoning."""
+    decision_interval_s: float = Field(5.0, gt=0)
+    episode_s: float = Field(900.0, gt=0)
+    reward_scale: float = Field(100.0, gt=0)
+    switch_penalty: float = Field(0.2, ge=0)
+    demand_vph: tuple[float, float] = (150.0, 600.0)
+    demand_imbalance: float = Field(0.3, ge=0, lt=1)
+    ped_rate_ph: tuple[float, float] = (0.0, 500.0)
+    n_envs: int = Field(8, ge=1)
+    total_timesteps: int = Field(300_000, ge=1)
+    seed: int = 0
+    eval_seeds: list[int] = Field(default_factory=lambda: [101, 102, 103, 104, 105])
+    eval_demand_vph: dict[str, float] = Field(default_factory=lambda: {"low": 250.0, "medium": 400.0, "high": 500.0})
+    model_path: str = "rl/models/ppo_signal.zip"
+    results_dir: str = "experiments/results/rl"
+    ppo: PPOSettings = PPOSettings()
+
+    @model_validator(mode="after")
+    def _ranges(self) -> "RLSettings":
+        for name in ("demand_vph", "ped_rate_ph"):
+            lo, hi = getattr(self, name)
+            if not 0 <= lo <= hi:
+                raise ValueError(f"{name} must be [low, high] with 0 <= low <= high")
+        return self
+
+
 class Config(_Strict):
     sim: SimSettings = SimSettings()
     vehicle_types: dict[str, VehicleTypeParams]
@@ -192,6 +232,7 @@ class Config(_Strict):
     metrics: MetricsSettings = MetricsSettings()
     logging: LoggingSettings = LoggingSettings()
     benchmark: BenchmarkSettings = BenchmarkSettings()
+    rl: RLSettings = RLSettings()
 
     @model_validator(mode="after")
     def _mix_types_exist(self) -> "Config":
@@ -206,6 +247,14 @@ class Config(_Strict):
 
     def runs_path(self) -> Path:
         p = Path(self.logging.runs_dir)
+        return p if p.is_absolute() else PROJECT_ROOT / p
+
+    def rl_model_path(self) -> Path:
+        p = Path(self.rl.model_path)
+        return p if p.is_absolute() else PROJECT_ROOT / p
+
+    def rl_results_path(self) -> Path:
+        p = Path(self.rl.results_dir)
         return p if p.is_absolute() else PROJECT_ROOT / p
 
     def benchmark_path(self) -> Path:

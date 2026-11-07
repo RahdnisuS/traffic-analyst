@@ -9,3 +9,9 @@ uvicorn[standard]>=0.30
 httpx>=0.27            # FastAPI TestClient
 # Phase 6: benchmark plots
 matplotlib>=3.8
+# Phase 7: reinforcement learning (CPU-only torch is enough:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu)
+torch>=2.5
+gymnasium>=1.0
+stable-baselines3>=2.4
+sb3-contrib>=2.4      # MaskablePPO: PPO with invalid-action masking

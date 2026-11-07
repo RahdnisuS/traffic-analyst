@@ -12,6 +12,7 @@ Work in progress. The full README (architecture diagram, results, learnings) com
 - [x] Phase 5: 2.5D Three.js view (orthographic tilted camera, low-poly instanced vehicles, capsule
       pedestrians, procedural buildings, glowing signals, soft shadows) with a toggle back to the 2D view
 - [x] Phase 6: stress test and capacity benchmark (`python -m bench`) plus a live stress test in the dashboard
+- [~] Phase 7: RL signal controller (Gymnasium env + MaskablePPO), code and tests done; model not trained yet
 
 ## Quick start
 ```bash
@@ -21,6 +22,9 @@ pip install -r requirements.txt
 python -m sim --duration 900  # headless run; logs to data/runs/<run_id>/ (use --no-log to skip)
 python -m server              # dashboard at http://127.0.0.1:8000
 python -m bench               # capacity benchmark (~70 s); results in experiments/results/benchmark/
+python -m rl.train            # train the RL signal controller (~20 min on 14 cores)
+python -m rl.evaluate         # compare it with the fixed timer on held-out seeds
+python -m sim --controller rl # headless run with the trained agent
 pytest -q
 ```
 

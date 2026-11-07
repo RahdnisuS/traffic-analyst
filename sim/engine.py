@@ -109,6 +109,9 @@ class Simulation:
         # Settings changes made while running (sliders, analyst scenarios). Logged as events so
         # the analyst can say "wait rose after you raised volume at 3:40".
         self.control_events: list[dict] = []
+        # Decisions made by a learning controller (RLPolicy), one dict each: what it saw, what it
+        # chose and how sure it was. Written to decisions.jsonl by the run logger.
+        self.decisions: list[dict] = []
         self._base_vph = dict(config.demand.per_approach_vph)
         self._params_cache: dict[str, VehicleTypeParams] = {}
         self._refresh_params()

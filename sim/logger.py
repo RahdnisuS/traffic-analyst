@@ -8,6 +8,8 @@ Layout of one run directory:
                    spillback, gridlock, LOS changes (episodes have start + end)
   trips.csv      - one row per completed vehicle trip (with vehicle type)
   peds.csv       - one row per completed pedestrian trip (kerb wait, crossing time)
+  decisions.jsonl - one line per RL agent decision (observation, action, P(switch), value);
+                   empty for the fixed timer
 
 WHY these formats: CSV loads directly into pandas/LightGBM (Phase 9). JSONL
 is append-only, so a crash loses at most the last line, and each line is
@@ -31,7 +33,8 @@ from .metrics import MetricsCollector
 from .pedestrian import PedTripRecord
 from .vehicle import TripRecord
 
-SCHEMA_VERSION = 2  # 2: Phase 4 added vehicle types, pedestrians, peds.csv and the PED phase
+SCHEMA_VERSION = 3  # 2: Phase 4 added vehicle types, pedestrians, peds.csv and the PED phase
+                    # 3: Phase 7 added decisions.jsonl (RL agent decisions)
 
 METRIC_DEFINITIONS = {
     "queued_vehicle": "vehicle on an inbound lane moving slower than metrics.queue_speed (m/s)",
@@ -54,6 +57,10 @@ METRIC_DEFINITIONS = {
     "ped_wait": "seconds a pedestrian stood at the kerb before starting to cross",
     "ped_wait_window": "mean ped_wait of crossings started in the rolling window",
     "veh_<type>": "vehicles of that type currently in the network",
+    "decision": "decisions.jsonl: one RL agent decision; action keep|switch, switched = the controller "
+                "accepted it, p_switch = the network's probability of switching, value = its estimate of "
+                "future reward (more negative = more waiting expected), queue/backlog/longest_wait_s = what "
+                "it saw per approach, obs = the exact scaled input vector",
 }
 
 
@@ -116,7 +123,7 @@ class RunLogger:
             "config": cfg.model_dump(mode="json"),
             "metric_definitions": METRIC_DEFINITIONS,
             "files": {"metrics": "metrics.csv", "events": "events.jsonl", "trips": "trips.csv",
-                      "pedestrians": "peds.csv"},
+                      "pedestrians": "peds.csv", "decisions": "decisions.jsonl"},
             "summary": None,
         }
         _write_json_atomic(self.dir / "manifest.json", self.manifest)
@@ -133,6 +140,8 @@ class RunLogger:
         self._peds = csv.DictWriter(self._peds_fh,
                                     fieldnames=[f.name for f in dataclasses.fields(PedTripRecord)])
         self._peds.writeheader()
+        self._decisions_fh = open(self.dir / "decisions.jsonl", "w", encoding="utf-8")
+        self._decision_idx = len(sim.decisions)
         self.closed = False
         if attach:
             sim.observers.append(self)
@@ -157,6 +166,11 @@ class RunLogger:
             self._peds.writerow(dataclasses.asdict(pt))
         if row is not None:
             self._metrics.writerow(row)
+        new = self.sim.decisions[self._decision_idx:]
+        if new:
+            self._decision_idx = len(self.sim.decisions)
+            for d in new:
+                self._decisions_fh.write(json.dumps(d, separators=(",", ":")) + "\n")
 
     def _write_events(self, events: list[dict]) -> None:
         for ev in events:
@@ -167,7 +181,7 @@ class RunLogger:
         if self.closed:
             return self.manifest
         self._write_events(self.collector.flush_open_episodes(self.sim))
-        for fh in (self._metrics_fh, self._events_fh, self._trips_fh, self._peds_fh):
+        for fh in (self._metrics_fh, self._events_fh, self._trips_fh, self._peds_fh, self._decisions_fh):
             fh.close()
         if self in self.sim.observers:
             self.sim.observers.remove(self)
@@ -183,7 +197,7 @@ class RunLogger:
     def discard(self) -> None:
         """Delete this run's directory (used for trivially short dashboard runs, e.g. a
         reset two seconds after starting), so data/runs/ isn't cluttered with noise."""
-        for fh in (self._metrics_fh, self._events_fh, self._trips_fh, self._peds_fh):
+        for fh in (self._metrics_fh, self._events_fh, self._trips_fh, self._peds_fh, self._decisions_fh):
             fh.close()
         if self in self.sim.observers:
             self.sim.observers.remove(self)

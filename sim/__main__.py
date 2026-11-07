@@ -24,10 +24,18 @@ def main() -> None:
     ap.add_argument("--report-every", type=float, default=60.0)
     ap.add_argument("--no-log", action="store_true", help="don't write a run log")
     ap.add_argument("--runs-dir", default=None, help="override logging.runs_dir")
+    ap.add_argument("--controller", choices=["fixed", "rl"], default=None,
+                    help="override signals.controller (rl loads the trained PPO model)")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
-    sim = Simulation(cfg, seed=args.seed)
+    if args.controller:
+        cfg.signals.controller = args.controller
+    policy = None
+    if cfg.signals.controller == "rl":
+        from rl.policy import RLPolicy  # torch is only needed for the RL controller
+        policy = RLPolicy.load(cfg)
+    sim = Simulation(cfg, seed=args.seed, policy=policy)
     log = None if (args.no_log or not cfg.logging.enabled) else \
         RunLogger(sim, controller=cfg.signals.controller, runs_dir=args.runs_dir)
     duration = args.duration or cfg.sim.duration_s

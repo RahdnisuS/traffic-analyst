@@ -134,7 +134,8 @@ def test_pedestrians_and_vehicle_types_are_logged(cfg, tmp_path):
     manifest = json.loads((d / "manifest.json").read_text())
     peds = list(csv.DictReader(open(d / "peds.csv")))
     summ = manifest["summary"]
-    assert manifest["schema_version"] == 2 and manifest["files"]["pedestrians"] == "peds.csv"
+    assert manifest["schema_version"] == 3 and manifest["files"]["pedestrians"] == "peds.csv"
+    assert manifest["files"]["decisions"] == "decisions.jsonl"
     assert peds and len(peds) == summ["pedestrians"]["completed"] == sim.peds.completed
     assert all(float(p["wait_time"]) >= 0 and float(p["crossing_time"]) > 0 for p in peds)
     assert set(summ["per_type"]) == {"auto", "bike", "bus", "car"}

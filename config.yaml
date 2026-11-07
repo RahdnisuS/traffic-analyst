@@ -65,7 +65,7 @@ driver:
   aggressiveness: 0.5     # 0 timid .. 0.5 baseline .. 1 aggressive (shorter headways, harder accel)
 
 signals:
-  controller: fixed
+  controller: fixed       # fixed | rl (the trained PPO agent; train it with python -m rl.train)
   green_s: 25             # per phase (a single number, or a list with one value per phase)
   amber_s: 3
   all_red_s: 2            # clearance so stragglers leave the box before conflicting traffic starts
@@ -148,3 +148,45 @@ benchmark:
   live_step_vph: 100
   live_step_s: 360        # simulated seconds per step (~2.5 cycles judged; noisier than the CLI)...
   live_settle_s: 60       # ...of which the first part settles and only the rest is judged
+
+# Reinforcement-learning signal controller (Phase 7): MaskablePPO (Stable-Baselines3 + sb3-contrib).
+# DECISIONS: every decision_interval_s on a fixed grid, the agent says keep the green (0) or switch
+#   to the next phase (1). It can only REQUEST a switch; amber, all-red, min green and the
+#   pedestrian phase are enforced by the signal controller, so a bad policy can be slow but never
+#   unsafe. While a switch is impossible the action is masked (it has no effect).
+# REWARD per decision = -(vehicle-seconds of waiting during the interval) / reward_scale
+#                       - switch_penalty if it switched.
+#   "Waiting" = a vehicle on the road below 0.1 m/s (the same definition as wait_time in the
+#   logs) PLUS every vehicle in the backlog (queued off the map because its lane is full). Without
+#   the backlog, starving one approach until it spills off the map would look free. Summed over an
+#   episode, the waiting term is exactly the run's total waiting time, so maximising reward =
+#   minimising total waiting.
+#   The switch penalty is small on purpose: a switch already costs amber + all-red, which shows up
+#   as waiting. It only discourages flicker-switching when the agent is indifferent.
+# TRAINING traffic is randomised per episode (demand, per-approach imbalance, pedestrians), so
+#   the agent learns a policy for any slider setting rather than one memorised demand level.
+rl:
+  decision_interval_s: 5
+  episode_s: 900          # 15 simulated minutes per episode, from an empty junction
+  reward_scale: 100       # 100 vehicle-seconds of waiting = -1 reward
+  switch_penalty: 0.2     # = 20 vehicle-seconds of waiting
+  demand_vph: [150, 600]  # mean demand per approach, drawn uniformly per episode (capacity ~450)
+  demand_imbalance: 0.3   # each approach x U(0.7, 1.3): uneven demand is where adaptive signals win
+  ped_rate_ph: [0, 500]
+  n_envs: 14              # parallel simulations, one process each (16-core machine: 2 left for PPO + OS)
+  total_timesteps: 300000 # decisions; ~30-40 min on 14 cores (one env does ~22 decisions/s)
+  seed: 0
+  eval_seeds: [101, 102, 103, 104, 105]   # never used in training
+  eval_demand_vph: {low: 250, medium: 400, high: 500}
+  model_path: rl/models/ppo_signal.zip
+  results_dir: experiments/results/rl
+  ppo:
+    learning_rate: 0.0003
+    n_steps: 256
+    batch_size: 256
+    n_epochs: 10
+    gamma: 0.99           # decisions are ~5 s apart: 0.99 looks ~100 decisions (~8 min) ahead
+    gae_lambda: 0.95
+    clip_range: 0.2
+    ent_coef: 0.01        # a little exploration bonus so it doesn't lock into "never switch"
+    net_arch: [64, 64]
