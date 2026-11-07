@@ -36,6 +36,8 @@ class Spawner:
         self.rng = rng
         self.arms = sorted(junction.inbound)  # sorted: fixed RNG draw order -> determinism
         self.backlog: dict[str, deque[PendingVehicle]] = {a: deque() for a in self.arms}
+        # Cumulative counters. Observers take differences, so nobody has to reset them.
+        self.arrivals_total: dict[str, int] = {a: 0 for a in self.arms}
         self._refresh_tables()
 
     def _refresh_tables(self) -> None:
@@ -68,6 +70,7 @@ class Spawner:
                 vtype = self._types[int(self.rng.choice(len(self._types), p=self._type_p))]
                 factor = float(np.clip(self.rng.normal(1.0, self.demand.speed_factor_std), 0.7, 1.3))
                 self.backlog[arm].append(PendingVehicle(now, vtype, movement, factor))
+                self.arrivals_total[arm] += 1
 
     def backlog_size(self) -> int:
         return sum(len(q) for q in self.backlog.values())

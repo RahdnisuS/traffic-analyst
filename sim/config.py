@@ -92,12 +92,40 @@ class IntersectionSettings(_Strict):
     conflict_distance_m: float = Field(2.5, gt=0)
 
 
+class MetricsSettings(_Strict):
+    queue_speed: float = Field(2.0, gt=0)
+    window_s: float = Field(120.0, gt=0)
+    queue_spike_on: int = Field(12, ge=1)
+    queue_spike_off: int = Field(8, ge=0)
+    spillback_on_frac: float = Field(0.9, gt=0, le=1)
+    spillback_off_frac: float = Field(0.7, ge=0, le=1)
+    gridlock_window_s: float = Field(60.0, gt=0)
+    gridlock_stopped_frac: float = Field(0.9, gt=0, le=1)
+    gridlock_min_vehicles: int = Field(4, ge=1)
+
+    @model_validator(mode="after")
+    def _hysteresis_order(self) -> "MetricsSettings":
+        # "off" must be below "on", or an episode could start and end in the same second.
+        if self.queue_spike_off >= self.queue_spike_on:
+            raise ValueError("queue_spike_off must be < queue_spike_on")
+        if self.spillback_off_frac >= self.spillback_on_frac:
+            raise ValueError("spillback_off_frac must be < spillback_on_frac")
+        return self
+
+
+class LoggingSettings(_Strict):
+    enabled: bool = True
+    runs_dir: str = "data/runs"
+
+
 class Config(_Strict):
     sim: SimSettings = SimSettings()
     vehicle_types: dict[str, VehicleTypeParams]
     demand: DemandSettings
     signals: SignalSettings = SignalSettings()
     intersection: IntersectionSettings = IntersectionSettings()
+    metrics: MetricsSettings = MetricsSettings()
+    logging: LoggingSettings = LoggingSettings()
 
     @model_validator(mode="after")
     def _mix_types_exist(self) -> "Config":
@@ -108,6 +136,10 @@ class Config(_Strict):
 
     def junction_path(self) -> Path:
         p = Path(self.sim.junction)
+        return p if p.is_absolute() else PROJECT_ROOT / p
+
+    def runs_path(self) -> Path:
+        p = Path(self.logging.runs_dir)
         return p if p.is_absolute() else PROJECT_ROOT / p
 
 

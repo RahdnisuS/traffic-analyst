@@ -34,13 +34,15 @@ from .idm import ballistic_step, idm_acceleration
 from .junction import Junction
 from .signals import FixedTimePolicy, SignalController, SignalPolicy
 from .spawner import PendingVehicle, Spawner
-from .vehicle import Vehicle
+from .vehicle import TripRecord, Vehicle
 
 WAIT_SPEED = 0.1      # m/s; below this a vehicle counts as "waiting" (same threshold as SUMO)
 STOP_BUFFER = 1.0     # virtual red-light obstacle sits this far past the stop line, so the
                       # front bumper rests about (s0 - 1) m before the line
 COMMIT_MARGIN = 1.0   # extra metres of look-ahead when deciding to commit on green
 INSERT_CLEARANCE = 0.5
+RESTART_SPEED = 1.0   # a stopped vehicle must exceed this before a new halt counts as another stop
+                      # (hysteresis: creeping forward in a queue is not a new stop)
 
 
 class EntryDecision(Enum):
@@ -79,6 +81,11 @@ class Simulation:
         # lanes[edge_id] = vehicles on that edge, FRONT FIRST (descending s)
         self.lanes: dict[str, list[Vehicle]] = {eid: [] for eid in self.junction.edge_order}
         self.counters = RunCounters()
+        # Trips completed during the latest step (observers read this, then it is reset).
+        self.recent_trips: list[TripRecord] = []
+        # Observer pattern: anything with ``after_step(sim)`` (metrics, logger, websocket
+        # streamer) can watch the sim without the sim knowing what it is.
+        self.observers: list = []
 
     @property
     def time(self) -> float:
@@ -88,12 +95,15 @@ class Simulation:
     # ================================================================== main loop
     def step(self) -> None:
         dt = self.dt
+        self.recent_trips = []
         self.policy.update(self.signals, self)
         self.signals.step(dt)
         self.spawner.generate(self.time, dt)
         self._insert_from_backlog()
         self._move_vehicles(dt)
         self.tick += 1
+        for obs in self.observers:
+            obs.after_step(self)
 
     def run(self, duration_s: float) -> None:
         for _ in range(int(round(duration_s / self.dt))):
@@ -128,10 +138,13 @@ class Simulation:
             # s* = s0 + v*T <= gap  ->  v <= (gap - s0) / T, and not faster than the leader.
             gap_ok_v = max(0.0, (space - params.min_gap) / params.time_headway)
             v = min(v, gap_ok_v, lane[-1].v + 2.0)
-        veh = Vehicle(id=self._next_id, vtype=pv.vtype, params=params,
-                      route=list(self.junction.routes[(lane_id, pv.movement)]),
+        route = list(self.junction.routes[(lane_id, pv.movement)])
+        free_flow = sum(self.junction.edges[e].length / min(desired, self.junction.edges[e].speed_limit)
+                        for e in route)
+        veh = Vehicle(id=self._next_id, vtype=pv.vtype, params=params, route=route,
                       origin=arm, movement=pv.movement, desired_speed=desired,
-                      arrival_time=pv.arrival_time, insert_time=self.time, v=v)
+                      arrival_time=pv.arrival_time, insert_time=self.time, v=v,
+                      free_flow_time=free_flow)
         self._next_id += 1
         self.vehicles[veh.id] = veh
         lane.append(veh)  # s=0 is behind everyone already on the lane
@@ -249,6 +262,11 @@ class Simulation:
             veh.s = new_s
             if veh.v < WAIT_SPEED:
                 veh.wait_time += dt
+                if not veh.is_stopped:
+                    veh.is_stopped = True
+                    veh.stops += 1
+            elif veh.v > RESTART_SPEED:
+                veh.is_stopped = False
             finished = False
             while veh.s > edges[veh.edge_id].length:
                 veh.s -= edges[veh.edge_id].length
@@ -266,10 +284,19 @@ class Simulation:
 
     def _complete_trip(self, veh: Vehicle, now: float) -> None:
         del self.vehicles[veh.id]
+        travel = now - veh.arrival_time  # includes any time spent in the backlog
         c = self.counters
         c.completed += 1
-        c.total_travel_time += now - veh.arrival_time  # includes any time spent in the backlog
+        c.total_travel_time += travel
         c.total_wait_time += veh.wait_time
+        self.recent_trips.append(TripRecord(
+            id=veh.id, vtype=veh.vtype, origin=veh.origin, movement=veh.movement,
+            exit_arm=self.junction.edges[veh.route[-1]].arm,
+            arrival_time=round(veh.arrival_time, 3), insert_time=round(veh.insert_time, 3),
+            exit_time=round(now, 3), travel_time=round(travel, 3),
+            entry_delay=round(veh.insert_time - veh.arrival_time, 3),
+            wait_time=round(veh.wait_time, 3),
+            delay=round(max(0.0, travel - veh.free_flow_time), 3), stops=veh.stops))
 
     # ================================================================== outputs
     def state(self) -> dict:

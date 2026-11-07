@@ -38,3 +38,18 @@ intersection:
   turn_lateral_accel: 2.5 # m/s^2; turn speed = sqrt(a_lat * radius)
   lookahead_m: 150        # how far ahead a driver scans for a leader across edges
   conflict_distance_m: 2.5 # two turning paths closer than this are treated as conflicting
+
+metrics:
+  queue_speed: 2.0        # m/s; slower than this on an inbound lane = queued (HCM uses ~5 mph)
+  window_s: 120           # rolling window for throughput, delay and Level of Service
+  queue_spike_on: 12      # vehicles queued on one approach -> a queue_spike episode starts
+  queue_spike_off: 8      # ...and ends when it falls back to this (hysteresis: no flicker)
+  spillback_on_frac: 0.9  # queue tail reaches 90% of lane length -> spillback episode
+  spillback_off_frac: 0.7
+  gridlock_window_s: 60   # no vehicle has left the junction for this long...
+  gridlock_stopped_frac: 0.9 # ...and >=90% of vehicles in the network are stopped
+  gridlock_min_vehicles: 4
+
+logging:
+  enabled: true
+  runs_dir: data/runs
