@@ -116,3 +116,32 @@ metrics:
 logging:
   enabled: true
   runs_dir: data/runs
+
+# Stress test / capacity benchmark (Phase 6). Demand is stepped up until the junction can no
+# longer serve it. "Breakdown" = OVERSATURATION, not literal gridlock: the box-junction rule means
+# the box itself never locks up; past capacity the extra demand just queues outside the network.
+# Vehicles are conserved, so for each approach over a measured window:
+#     arrivals - departures = growth of that approach's stock (on the road + waiting to enter)
+# A level FAILS if any approach's stock grows by more than max(unserved_frac x its arrivals,
+# unserved_min) vehicles, i.e. it serves under ~95% of its demand, or if gridlock is detected.
+# Stock growth is measured between cycle-AVERAGED stocks (queues are a sawtooth over each cycle).
+# Capacity score = total throughput (veh/h) at the highest level that passed.
+benchmark:
+  seeds: [1, 2, 3]        # each seed is an independent ramp; the score is reported as mean +/- std
+  start_vph: 100          # mean demand per approach at the first level (config ratios are kept)
+  step_vph: 50
+  max_vph: 1500
+  warmup_s: 300           # fill the network before measuring (an empty junction flatters capacity)
+  measure_s: 1200         # ~10 cycles. Measured: with 600 s, levels near capacity flipped between
+                          # pass and fail by seed; with 1200 s every seed agrees to within one step
+  unserved_frac: 0.05     # an approach may fall this far behind its demand and still "pass"...
+  unserved_min: 10        # ...or this many vehicles, whichever is larger: residual noise after
+                          # cycle-averaging (uneven cycles when a pedestrian phase is inserted)
+  fails_to_stop: 2        # stop the ramp after this many consecutive failed levels (noise guard)
+  results_dir: experiments/results/benchmark
+  # Live dashboard ramp: one continuous run, so queues carry over between steps. A demo and
+  # sanity check; the official score comes from `python -m bench`.
+  live_start_vph: 100
+  live_step_vph: 100
+  live_step_s: 360        # simulated seconds per step (~2.5 cycles judged; noisier than the CLI)...
+  live_settle_s: 60       # ...of which the first part settles and only the rest is judged

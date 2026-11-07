@@ -56,12 +56,14 @@ function handle(msg) {
       $("events").innerHTML = "";
       addEvents(msg.events);
       buildSpeeds(msg.limits.speeds);
+      showBenchmark(msg.benchmark);
       configureSliders(msg.limits);
       applyStatus(msg);
       if (msg.history.length) updateKpis(msg.history.at(-1));
       break;
     case "frame":
       frames.push(msg, performance.now());
+      updateStressProgress(msg.t);
       $("hud-clock").textContent = clock(msg.t);
       $("hud-phase").textContent = msg.phase === "PED"
         ? `Pedestrian phase · ${{ walk: "walk", ped_clear: "finish crossing", all_red: "all-red" }[msg.stage] ?? msg.stage}`
@@ -101,7 +103,84 @@ function applyStatus(s) {
     if (el && document.activeElement !== el) el.value = w;
   }
   updateMixLabels();
+  applyStress(s.stress);
   if (s.error) toast(s.error);
+}
+
+// ------------------------------------------------------------------ capacity / stress test
+const fmt = (v) => Math.round(v).toLocaleString();
+
+/** The official score: the latest saved `python -m bench` result (sent in `init`). */
+function showBenchmark(b) {
+  const el = $("bench-official");
+  if (!b?.score) {
+    el.innerHTML = "No benchmark saved yet. Run <code>python -m bench</code>.";
+    return;
+  }
+  const sc = b.score;
+  el.textContent = "";
+  const strong = document.createElement("strong");
+  strong.textContent = `${sc.censored ? "≥ " : ""}${fmt(sc.mean_vph)} ± ${fmt(sc.std_vph)} veh/h`;
+  el.append(strong, document.createElement("br"),
+    `Benchmark over ${sc.n} seeds (${new Date(b.created_at).toLocaleDateString()}). ` +
+    `Peak while overloaded: ${fmt(sc.peak_served_mean_vph)} veh/h.`);
+  el.title = b.definition;
+}
+
+function applyStress(st) {
+  state.stress = st;
+  const running = !!st?.active;
+  const btn = $("btn-stress");
+  btn.textContent = running ? "Stop stress test" : "Run stress test";
+  btn.classList.toggle("primary", running);
+  // The ramp owns the demand while it runs: settings are locked (the server enforces it too).
+  document.querySelector(".controls").classList.toggle("locked", running);
+  for (const el of document.querySelectorAll(".controls .slider input")) el.disabled = running;
+
+  const list = $("stress-steps");
+  list.hidden = !st?.steps?.length;
+  list.innerHTML = "";
+  for (const s of st?.steps ?? []) {
+    const li = document.createElement("li");
+    const left = document.createElement("span");
+    left.textContent = `${fmt(s.volume_vph)} veh/h per approach: served ${fmt(s.served_vph)} of ${fmt(s.offered_vph)}`;
+    const right = document.createElement("span");
+    right.className = s.passed ? "ok" : "bad";
+    // Words as well as colour, never colour alone.
+    right.textContent = s.passed ? "kept up"
+      : `overloaded${s.failing_approaches.length ? ` (${s.failing_approaches.join(", ")})` : ""}`;
+    li.append(left, right);
+    list.append(li);
+  }
+  const live = $("stress-live");
+  if (!running && st?.result) {
+    const r = st.result;
+    live.hidden = false;
+    live.textContent = r.capacity_vph == null
+      ? `Stress test ${r.reason === "stopped" ? "stopped" : "ended"}: no step kept up.`
+      : `Kept up to ${fmt(r.capacity_level_vph)} veh/h per approach` +
+        (r.overloaded_level_vph != null ? `, clearly overloaded at ${fmt(r.overloaded_level_vph)}` : "") +
+        (r.reason === "stopped" ? " (stopped early)" : r.censored ? " (never overloaded)" : "") +
+        `. Volume restored to ${fmt(r.restored_vph)}. ` +
+        "Short live steps only catch clear overload, so this reads higher than the benchmark score.";
+  } else live.hidden = !running;
+}
+
+/** Progress within the current ramp step, from the sim clock in each frame. */
+function updateStressProgress(t) {
+  const st = state.stress;
+  if (!st?.active) return;
+  const into = Math.max(0, t - st.step_start_t);
+  const live = $("stress-live");
+  live.textContent = `Step ${st.step}: ${fmt(st.level_vph)} veh/h per approach · ` +
+    (into >= st.settle_s ? `measuring ${clock(into - st.settle_s)} of ${clock(st.step_s - st.settle_s)}`
+                         : `settling ${clock(into)}`);
+  const bar = document.createElement("span");
+  bar.className = "bar";
+  const fill = document.createElement("i");
+  fill.style.width = `${Math.min(100, (100 * into) / st.step_s)}%`;
+  bar.append(fill);
+  live.append(bar);
 }
 
 // ------------------------------------------------------------------ KPIs
@@ -144,6 +223,15 @@ function describe(e) {
       return on ? `GRIDLOCK: ${e.in_network} vehicles, none leaving` : `Gridlock cleared after ${Math.round(e.duration_s)} s`;
     case "ped_phase":
       return `Pedestrian phase: ${e.waiting} crossing` + (e.waiting ? `, longest wait ${Math.round(e.max_wait)} s` : "");
+    case "stress_start":
+      return `Stress test started: ${fmt(e.start_vph)} veh/h per approach, +${fmt(e.step_vph)} every ${clock(e.step_s)}`;
+    case "stress_step":
+      return `Stress step ${e.step} (${fmt(e.volume_vph)} veh/h per approach): served ${fmt(e.served_vph)} of ` +
+             `${fmt(e.offered_vph)} veh/h, ${e.passed ? "kept up" : "overloaded"}`;
+    case "stress_result":
+      return e.capacity_vph == null ? `Stress test ${e.reason}: no step kept up`
+        : `Stress test ${e.reason === "stopped" ? "stopped" : "finished"}: kept up to ${fmt(e.capacity_level_vph)} ` +
+          `veh/h per approach` + (e.overloaded_level_vph != null ? `, overloaded at ${fmt(e.overloaded_level_vph)}` : "");
     case "los_change":
       return `Level of Service ${e.from ?? "–"} → ${e.to} (delay ${e.mean_delay_window} s)`;
     case "config_change": {
@@ -164,6 +252,8 @@ function describe(e) {
 function addEvents(list) {
   const ol = $("events");
   for (const e of list) {
+    // The ramp's own volume changes are logged, but the stress-step lines already say it here.
+    if (e.type === "config_change" && e.source === "stress_test") continue;
     const li = document.createElement("li");
     const time = document.createElement("time");
     time.textContent = e.clock;
@@ -266,6 +356,7 @@ for (const [id, key] of [["sl-volume", "volume_vph"], ["sl-aggr", "aggressivenes
 }
 
 $("btn-play").onclick = () => send({ cmd: state.playing ? "pause" : "play" });
+$("btn-stress").onclick = () => send({ cmd: "stress", action: state.stress?.active ? "stop" : "start" });
 $("btn-reset").onclick = () => {
   const seed = Number.parseInt($("seed").value, 10);
   send({ cmd: "reset", seed: Number.isFinite(seed) && seed >= 0 ? seed : null });

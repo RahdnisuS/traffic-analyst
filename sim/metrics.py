@@ -331,6 +331,15 @@ class MetricsCollector:
                                      "peak_t": round(ep.peak_t, 1), "peak_clock": clock(ep.peak_t),
                                      **({"truncated": True} if truncated else {})})
 
+    def episode_active(self, kind: str) -> bool:
+        """Is an episode of this kind (e.g. "gridlock") open right now?"""
+        return any(k[0] == kind for k in self._episodes)
+
+    def custom_event(self, kind: str, t: float, fields: dict) -> dict:
+        """An event raised by another observer (e.g. the live stress test), numbered in the same
+        sequence as the collector's own, so the run log stays one ordered stream."""
+        return self._event(kind, t, fields)
+
     def _event(self, kind: str, t: float, fields: dict) -> dict:
         ev = {"id": self._next_event_id, "type": kind, "t": round(t, 1), "clock": clock(t), **fields}
         self._next_event_id += 1

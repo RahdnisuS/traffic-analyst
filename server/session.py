@@ -25,13 +25,15 @@ from collections import deque
 
 from fastapi import WebSocket
 
+from bench.live import LiveStressTest
+from bench.stress import latest_summary
 from sim.config import Config
 from sim.engine import Simulation
 from sim.logger import RunLogger
 from sim.metrics import MetricsCollector
 
 from .schemas import (GREEN_MAX_S, PED_RATE_MAX, SPEEDS, VOLUME_MAX_VPH, PauseCmd, PlayCmd, ResetCmd,
-                      SettingsCmd, SpeedCmd)
+                      SettingsCmd, SpeedCmd, StressCmd)
 
 log = logging.getLogger("traffic.session")
 
@@ -94,6 +96,8 @@ class SimSession:
         self._pending_rows: list[dict] = []
         self._pending_events: list[dict] = []
         self.last_error: str | None = None
+        self.stress: LiveStressTest | None = None
+        self._status_dirty = False
         self._new_sim(self.seed, settings=None)
 
     # ------------------------------------------------------------------ lifecycle
@@ -108,6 +112,7 @@ class SimSession:
                                  collector=self.collector, attach=False)
                        if self.log_runs else None)
         self.sim.observers.append(self)
+        self.stress = None  # a stress test belongs to one sim
         self.recent_events.clear()
         self._pending_rows.clear()
         self._pending_events.clear()
@@ -126,6 +131,12 @@ class SimSession:
     # ------------------------------------------------------------------ observer
     def after_step(self, sim) -> None:
         row, events, trips, ped_trips = self.collector.after_step(sim)
+        if self.stress is not None and self.stress.active:
+            # Same event stream as the collector's: logged to disk and shown in the dashboard.
+            stress_events = self.stress.after_step(sim)
+            if stress_events:
+                events = events + stress_events
+                self._status_dirty = True  # step finished: browsers need the new stress status
         if self.logger:
             self.logger.record(row, events, trips, ped_trips)
         if row is not None:
@@ -147,7 +158,16 @@ class SimSession:
     def status(self) -> dict:
         return {"type": "status", "playing": self.playing, "speed": self.speed, "seed": self.sim.seed,
                 "run_id": self.logger.run_id if self.logger else None,
-                "settings": self.settings(), "error": self.last_error}
+                "settings": self.settings(), "error": self.last_error,
+                "stress": self.stress.status() if self.stress else None}
+
+    def benchmark_brief(self) -> dict | None:
+        """The latest saved `python -m bench` result, trimmed to what the dashboard shows."""
+        b = latest_summary(self.base_cfg.benchmark_path())
+        if not b:
+            return None
+        return {"id": b["id"], "created_at": b["created_at"], "seeds": b["seeds"], "score": b["score"],
+                "config_hash": b["config_hash"], "definition": b["definition"]}
 
     def init_message(self) -> dict:
         sig = self.sim.cfg.signals
@@ -163,6 +183,7 @@ class SimSession:
                        "n_phases": n, "walk_s": self.sim.cfg.pedestrians.walk_s,
                        "ped_clear_s": self.sim.ped_clear_s},
             "ped_radius": self.sim.cfg.pedestrians.radius,
+            "benchmark": self.benchmark_brief(),
             "history": list(self.collector.history)[-HISTORY_ON_CONNECT:],
             "events": list(self.recent_events),
             **{k: v for k, v in self.status().items() if k != "type"},
@@ -194,17 +215,37 @@ class SimSession:
             if cmd.value not in SPEEDS:
                 raise ValueError(f"speed must be one of {list(SPEEDS)}")
             self.speed = cmd.value
+        elif isinstance(cmd, StressCmd):
+            if cmd.action == "start":
+                if self.stress is not None and self.stress.active:
+                    raise ValueError("a stress test is already running")
+                self.stress = LiveStressTest(self.sim, self.collector, self.sim.cfg.benchmark, VOLUME_MAX_VPH)
+                self.playing = True  # a ramp only makes sense while the sim runs
+            elif self.stress is not None and self.stress.active:
+                self._pending_events.extend(self._log_events(self.stress.stop(self.sim)))
         elif isinstance(cmd, ResetCmd):
+            if self.stress is not None and self.stress.active:
+                # Restore the user's volume first, so the reset keeps THEIR settings, not a ramp level.
+                self._log_events(self.stress.stop(self.sim))
             keep = self.settings()
             self.close_run()
             self._new_sim(cmd.seed if cmd.seed is not None else self.sim.seed, keep)
             self.last_error = None
             self._broadcast(self.init_message())
         elif isinstance(cmd, SettingsCmd):
+            if self.stress is not None and self.stress.active:
+                # The ramp owns the demand while it runs; any other change would muddle its result.
+                raise ValueError("stop the stress test before changing settings")
             self.sim.apply_settings(volume_vph=cmd.volume_vph, aggressiveness=cmd.aggressiveness,
                                     green_s=cmd.green_s, vehicle_mix=cmd.vehicle_mix,
                                     ped_rate_ph=cmd.ped_rate_ph, source="dashboard")
         self._broadcast(self.status())
+
+    def _log_events(self, events: list[dict]) -> list[dict]:
+        """Events raised outside a sim step (e.g. stopping the stress test) still go to the log."""
+        if self.logger and events:
+            self.logger.record(None, events, [])
+        return events
 
     # ------------------------------------------------------------------ main loop
     def _frame(self) -> dict:
@@ -254,6 +295,9 @@ class SimSession:
             self.recent_events.extend(notable)
             self._broadcast({"type": "events", "events": self._pending_events})
             self._pending_events = []
+        if self._status_dirty:
+            self._status_dirty = False
+            self._broadcast(self.status())
         if self.clients:
             text = _dumps(self._frame())  # serialise once, share with every client
             for c in self.clients:

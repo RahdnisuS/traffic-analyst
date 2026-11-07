@@ -95,6 +95,19 @@
         <div class="kpi"><span class="kpi-label">Pedestrian wait</span><span id="kpi-pwait" class="kpi-value">–</span><span class="kpi-sub">at the kerb, last 2 min</span></div>
       </section>
 
+      <section class="card bench" aria-label="Capacity benchmark">
+        <div class="bench-head">
+          <h2>Junction capacity</h2>
+          <button id="btn-stress" class="btn">Run stress test</button>
+        </div>
+        <p id="bench-official" class="bench-official">No benchmark saved yet. Run <code>python -m bench</code>.</p>
+        <p id="stress-live" class="stress-live" aria-live="polite" hidden></p>
+        <ol id="stress-steps" class="stress-steps" hidden></ol>
+        <p class="hint">The stress test ramps demand on this live run (+100 veh/h per approach every 6 simulated
+          minutes) until queues clearly grow faster than they clear. Try it at 20× speed. The score above comes
+          from <code>python -m bench</code>: fresh 25-minute runs per level on 3 seeds.</p>
+      </section>
+
       <section class="card chart-card">
         <h2>Queued vehicles by approach</h2>
         <div class="chart-box"><canvas id="ch-queue" role="img" aria-label="Line chart of queued vehicles per approach over the last 5 minutes"></canvas></div>

@@ -97,6 +97,11 @@ Phase 14 – Unit tests (IDM, signal logic, scenario parser, retrieval), error h
 | 2026-11-07 | 5 | Vehicles: one `InstancedMesh` per part per type (chassis, body, cabin/canopy/window band, brake-light bar), with geometry pre-offset so the origin is the front bumper: one matrix per vehicle drives all its parts. Body colour is a stable hash of the vehicle id; type is shown by shape and livery (green autos, red/blue/orange buses). |
 | 2026-11-07 | 5 | Speed state, which the 2D view shows as colour, is shown in 3D as **brake lights** (on below the 2 m/s queue speed). |
 | 2026-11-07 | 5 | Camera: orthographic, 55° elevation, from the south-east, with 90° rotation steps (Q/E). Buildings are procedural from a fixed seed and kept low near the junction so they don't hide the stop lines. Sun ~42° high from the west-south-west; the 2048² shadow map covers the inner ±60% of the map only, for sharp shadows where people look. Dark theme = dusk lighting. |
+| 2026-11-07 | 6 | **Breakdown = oversaturation, not literal gridlock.** The box-junction rule means the box never locks up: past capacity, extra demand queues outside the network without limit (probe at 3,000 veh/h per approach: 0 gridlock events, 2,916 vehicles waiting to enter). A level fails if any approach serves < 95% of its arrivals (`unserved_frac`, with a 10-vehicle noise floor), or if the existing gridlock detector fires. Matches the HCM notion of capacity (demand > capacity). |
+| 2026-11-07 | 6 | Judged **per approach** via conservation of vehicles: arrivals - departures = growth of the approach's stock (on the road + waiting to enter). Per approach because the busier N/S approaches break down first and a junction total hides it. |
+| 2026-11-07 | 6 | Stock growth is measured between **cycle-averaged** stocks (one signal cycle at each end of the window). Queues are a sawtooth over the cycle; comparing single instants gave scores of 1,044 to 2,304 veh/h for the same junction depending on the seed. |
+| 2026-11-07 | 6 | **Independent runs per demand level** (fresh sim, 300 s warm-up, 1,200 s measured), +50 veh/h per approach per level, stop after 2 consecutive failures, seeds 1/2/3 in parallel processes. 600 s windows still flipped pass/fail near capacity; 1,200 s made all seeds agree within one step. Capacity score = served throughput at the highest passing level, mean ± std over seeds; peak throughput under overload is reported separately (not sustainable). |
+| 2026-11-07 | 6 | `python -m bench` produces the official score (saved to `experiments/results/benchmark/<timestamp>_s1-2-3/`: summary.json, levels.csv, report.md, plot.png; records config hash and commit, `-dirty` if the code was uncommitted). The dashboard's **live stress test** ramps the running sim (+100 veh/h per approach every 360 s, first 60 s not judged), locks the settings while it runs, logs `stress_*` events, restores the user's volume at the end. Measured: 5-minute live windows can't resolve the 5% threshold (the last passing level varied 300–700 veh/h per approach across seeds; even 22-minute steps varied by a step), so the dashboard shows "kept up to X, clearly overloaded at Y" beside the official score instead of a second capacity number. |
 
 ## Status
 
@@ -108,4 +113,7 @@ Phase 14 – Unit tests (IDM, signal logic, scenario parser, retrieval), error h
 - [x] Phase 5 – 2.5D renderer (commit 62c61a0; 70 tests). Verified in headless Edge (SwiftShader) at ~130–150 vehicles: desktop,
       390 px phone, light and dark themes, 2D toggle. Open item: 60 FPS on real laptop hardware is
       not yet measured (press F in the dashboard for the frame-rate readout).
-- [ ] Phase 6 – Stress test and benchmark (next)
+- [x] Phase 6 – Stress test and benchmark (83 tests). Capacity of the default junction (fixed time, 25 s
+      green): **2,077 ± 115 veh/h** over seeds 1–3; breakdown at 550–600 veh/h per approach; peak under
+      overload ~2,320 veh/h. Live stress test checked in the browser.
+- [ ] Phase 7 – RL signal controller (next)

@@ -50,6 +50,12 @@ class SettingsCmd(_Cmd):
     ped_rate_ph: float | None = Field(None, ge=0, le=PED_RATE_MAX)
 
 
-Command = Annotated[Union[PlayCmd, PauseCmd, SpeedCmd, ResetCmd, SettingsCmd],
+class StressCmd(_Cmd):
+    """Start or stop the live stress test (demand ramp until breakdown)."""
+    cmd: Literal["stress"]
+    action: Literal["start", "stop"]
+
+
+Command = Annotated[Union[PlayCmd, PauseCmd, SpeedCmd, ResetCmd, SettingsCmd, StressCmd],
                     Field(discriminator="cmd")]
 command_adapter: TypeAdapter = TypeAdapter(Command)

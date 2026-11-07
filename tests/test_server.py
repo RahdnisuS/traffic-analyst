@@ -104,3 +104,54 @@ def test_client_outbox_drops_stale_frames_but_keeps_reliable_messages():
     c.send("m2")
     assert c.frame == "f2" and c.dropped_frames == 1
     assert list(c.reliable) == ["m1", "m2"]
+
+
+def test_stress_test_over_websocket(client):
+    with client.websocket_connect("/ws/sim") as ws:
+        init = recv_until(ws, "init")
+        assert "benchmark" in init and init["stress"] is None
+        original = init["settings"]["volume_vph"]
+        ws.send_json({"cmd": "stress", "action": "start"})
+        st = recv_until(ws, "status")
+        assert st["playing"] and st["stress"]["active"] and st["stress"]["step"] == 1
+        assert st["settings"]["volume_vph"] == st["stress"]["level_vph"]
+        # The ramp owns the demand: other setting changes are refused while it runs.
+        ws.send_json({"cmd": "settings", "volume_vph": 800})
+        assert "stress test" in recv_until(ws, "error")["message"]
+        ws.send_json({"cmd": "stress", "action": "start"})
+        assert "already running" in recv_until(ws, "error")["message"]
+        ws.send_json({"cmd": "stress", "action": "stop"})
+        st = recv_until(ws, "status")
+        assert not st["stress"]["active"] and st["stress"]["result"]["reason"] == "stopped"
+        assert st["settings"]["volume_vph"] == original  # restored
+
+
+def test_reset_during_stress_test_keeps_user_volume(client):
+    with client.websocket_connect("/ws/sim") as ws:
+        original = recv_until(ws, "init")["settings"]["volume_vph"]
+        ws.send_json({"cmd": "stress", "action": "start"})
+        recv_until(ws, "status")
+        ws.send_json({"cmd": "reset", "seed": 5})
+        init = recv_until(ws, "init")
+        assert init["settings"]["volume_vph"] == original and init["stress"] is None
+
+
+def test_benchmark_endpoint(tmp_path):
+    from bench.stress import save_results
+
+    cfg = load_config()
+    cfg.benchmark.results_dir = str(tmp_path / "bench")
+    app = create_app(cfg, runs_dir=tmp_path / "runs", log_runs=False)
+    with TestClient(app) as c:
+        assert c.get("/api/benchmark").status_code == 404
+        fake = {"schema_version": 1, "created_at": "2026-11-07T00:00:00+00:00", "seeds": [1],
+                "config_hash": "abc", "definition": "test", "junction": "x", "git_commit": None,
+                "settings": {"controller": "fixed", "green_s": 25},
+                "score": {"mean_vph": 2000.0, "std_vph": 0.0, "min_vph": 2000.0, "max_vph": 2000.0, "n": 1,
+                          "censored": False, "peak_served_mean_vph": 2300.0},
+                "ramps": []}
+        save_results(fake, tmp_path / "bench")
+        body = c.get("/api/benchmark").json()
+        assert body["score"]["mean_vph"] == 2000.0
+        with c.websocket_connect("/ws/sim") as ws:
+            assert recv_until(ws, "init")["benchmark"]["score"]["mean_vph"] == 2000.0

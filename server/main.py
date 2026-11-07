@@ -25,6 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from sim.config import PROJECT_ROOT, Config, load_config
+from bench.stress import latest_summary
 from sim.logger import list_runs
 
 from .schemas import command_adapter
@@ -77,6 +78,14 @@ def create_app(cfg: Config | None = None, runs_dir: str | Path | None = None,
         if not mf.is_file():
             raise HTTPException(404, "run not found")
         return json.loads(mf.read_text(encoding="utf-8"))
+
+    @app.get("/api/benchmark")
+    async def benchmark():
+        """Full summary of the most recent `python -m bench` run (404 if none has been saved)."""
+        b = latest_summary(cfg.benchmark_path())
+        if not b:
+            raise HTTPException(404, "no benchmark has been run yet: python -m bench")
+        return b
 
     @app.websocket("/ws/sim")
     async def ws_sim(ws: WebSocket):

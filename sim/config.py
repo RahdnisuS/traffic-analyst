@@ -154,6 +154,32 @@ class LoggingSettings(_Strict):
     runs_dir: str = "data/runs"
 
 
+class BenchmarkSettings(_Strict):
+    """Stress test / capacity benchmark (Phase 6). See the benchmark section of config.yaml."""
+    seeds: list[int] = Field(default_factory=lambda: [1, 2, 3], min_length=1)
+    start_vph: float = Field(100.0, gt=0)
+    step_vph: float = Field(50.0, gt=0)
+    max_vph: float = Field(1500.0, gt=0)
+    warmup_s: float = Field(300.0, ge=0)
+    measure_s: float = Field(1200.0, gt=0)
+    unserved_frac: float = Field(0.05, ge=0, lt=1)
+    unserved_min: int = Field(10, ge=0)
+    fails_to_stop: int = Field(2, ge=1)
+    results_dir: str = "experiments/results/benchmark"
+    live_start_vph: float = Field(100.0, gt=0)
+    live_step_vph: float = Field(100.0, gt=0)
+    live_step_s: float = Field(360.0, gt=0)
+    live_settle_s: float = Field(60.0, ge=0)
+
+    @model_validator(mode="after")
+    def _ranges(self) -> "BenchmarkSettings":
+        if self.max_vph < self.start_vph:
+            raise ValueError("max_vph must be >= start_vph")
+        if self.live_settle_s >= self.live_step_s:
+            raise ValueError("live_settle_s must be < live_step_s (something must be measured)")
+        return self
+
+
 class Config(_Strict):
     sim: SimSettings = SimSettings()
     vehicle_types: dict[str, VehicleTypeParams]
@@ -164,6 +190,7 @@ class Config(_Strict):
     pedestrians: PedestrianSettings = PedestrianSettings()
     metrics: MetricsSettings = MetricsSettings()
     logging: LoggingSettings = LoggingSettings()
+    benchmark: BenchmarkSettings = BenchmarkSettings()
 
     @model_validator(mode="after")
     def _mix_types_exist(self) -> "Config":
@@ -178,6 +205,10 @@ class Config(_Strict):
 
     def runs_path(self) -> Path:
         p = Path(self.logging.runs_dir)
+        return p if p.is_absolute() else PROJECT_ROOT / p
+
+    def benchmark_path(self) -> Path:
+        p = Path(self.benchmark.results_dir)
         return p if p.is_absolute() else PROJECT_ROOT / p
 
 
