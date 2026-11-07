@@ -9,8 +9,9 @@ const $ = (id) => document.getElementById(id);
 const frames = new FrameBuffer();
 const renderer = new Renderer2D($("view2d"));
 const charts = new Charts($("ch-queue"), $("ch-delay"));
-const state = { limits: null, playing: false, speed: 1, ws: null, retry: 0 };
+const state = { limits: null, playing: false, speed: 1, ws: null, retry: 0, types: [] };
 const MAX_EVENTS = 80;
+const TYPE_NAMES = { car: "Cars", bike: "Bikes", auto: "Autos", bus: "Buses" };
 
 // ------------------------------------------------------------------ connection
 function connect() {
@@ -42,7 +43,9 @@ function handle(msg) {
   switch (msg.type) {
     case "init":
       state.limits = msg.limits;
-      renderer.setLayout(msg.layout, msg.vehicle_types.map((t) => msg.vehicle_dims[t]));
+      renderer.setLayout(msg.layout, msg.vehicle_types.map((t) => msg.vehicle_dims[t]),
+                         msg.vehicle_types, msg.ped_radius);
+      buildMix(msg.vehicle_types);
       frames.clear();
       charts.reset(msg.history);
       $("events").innerHTML = "";
@@ -55,7 +58,9 @@ function handle(msg) {
     case "frame":
       frames.push(msg, performance.now());
       $("hud-clock").textContent = clock(msg.t);
-      $("hud-phase").textContent = `Phase ${msg.phase} · ${msg.stage.replace("_", "-")}`;
+      $("hud-phase").textContent = msg.phase === "PED"
+        ? `Pedestrian phase · ${{ walk: "walk", ped_clear: "finish crossing", all_red: "all-red" }[msg.stage] ?? msg.stage}`
+        : `Phase ${msg.phase} · ${msg.stage.replace("_", "-")}`;
       break;
     case "metrics":
       charts.addRows(msg.rows);
@@ -85,6 +90,12 @@ function applyStatus(s) {
   setSlider("sl-volume", st.volume_vph);
   setSlider("sl-aggr", st.aggressiveness);
   if (st.green_s != null) setSlider("sl-green", st.green_s);
+  if (st.ped_rate_ph != null) setSlider("sl-peds", st.ped_rate_ph);
+  if (st.vehicle_mix) for (const [t, w] of Object.entries(st.vehicle_mix)) {
+    const el = $(`mix-${t}`);
+    if (el && document.activeElement !== el) el.value = w;
+  }
+  updateMixLabels();
   if (s.error) toast(s.error);
 }
 
@@ -107,6 +118,11 @@ function updateKpis(r) {
     badge.textContent = `LOS ${r.los} · ${words}`; // letter + words: never colour alone
     badge.style.setProperty("--los-color", `var(${color})`);
   } else badge.hidden = true;
+  $("kpi-peds").textContent = r.peds_in_network ?? 0;
+  $("kpi-peds-sub").textContent = r.peds_crossing ? `${r.peds_crossing} crossing, ${r.peds_waiting} waiting`
+    : r.peds_waiting ? `${r.peds_waiting} waiting (longest ${Math.round(r.ped_longest_wait)} s)` : "none waiting";
+  const pw = r.ped_wait_window;
+  $("kpi-pwait").textContent = pw !== "" && pw != null ? `${Number(pw).toFixed(0)} s` : "–";
 }
 
 // ------------------------------------------------------------------ events list
@@ -121,6 +137,8 @@ function describe(e) {
       return on ? `Spillback on ${e.lane}: queue ${e.queue_m} m long` : `Spillback on ${e.lane} ended after ${Math.round(e.duration_s)} s`;
     case "gridlock":
       return on ? `GRIDLOCK: ${e.in_network} vehicles, none leaving` : `Gridlock cleared after ${Math.round(e.duration_s)} s`;
+    case "ped_phase":
+      return `Pedestrian phase: ${e.waiting} crossing` + (e.waiting ? `, longest wait ${Math.round(e.max_wait)} s` : "");
     case "los_change":
       return `Level of Service ${e.from ?? "–"} → ${e.to} (delay ${e.mean_delay_window} s)`;
     case "config_change": {
@@ -128,6 +146,9 @@ function describe(e) {
       if (c.per_approach_vph) parts.push(`volume ${Object.entries(c.per_approach_vph).map(([a, v]) => `${a} ${Math.round(v)}`).join(", ")} veh/h`);
       if (c.aggressiveness != null) parts.push(`aggressiveness ${c.aggressiveness}`);
       if (c.green_s != null) parts.push(`green ${c.green_s} s`);
+      if (c.ped_rate_ph != null) parts.push(`pedestrians ${Math.round(c.ped_rate_ph)}/h`);
+      if (c.vehicle_mix) parts.push(`mix ${Object.entries(c.vehicle_mix).filter(([, w]) => w > 0)
+        .map(([t, w]) => `${Math.round(w * 100)}% ${t}`).join(", ")}`);
       return `Settings changed: ${parts.join("; ")}`;
     }
     default:
@@ -165,8 +186,46 @@ function buildSpeeds(speeds) {
   }
 }
 
+// Vehicle mix: one slider per type. Values are weights (the server normalises), shown as shares.
+function buildMix(types) {
+  if (types.join() === state.types.join()) return;
+  state.types = types;
+  const box = $("mix-sliders");
+  box.innerHTML = "";
+  for (const t of types) {
+    const wrap = document.createElement("div");
+    wrap.className = "slider";
+    const label = document.createElement("label");
+    label.htmlFor = `mix-${t}`;
+    label.append(TYPE_NAMES[t] ?? t, " ");
+    const out = document.createElement("output");
+    out.id = `mixout-${t}`;
+    label.append(out);
+    const input = document.createElement("input");
+    Object.assign(input, { id: `mix-${t}`, type: "range", min: 0, max: 100, step: 5 });
+    input.addEventListener("input", updateMixLabels);
+    input.addEventListener("change", () => {
+      const mix = Object.fromEntries(state.types.map((k) => [k, Number($(`mix-${k}`).value)]));
+      if (Object.values(mix).some((w) => w > 0)) send({ cmd: "settings", vehicle_mix: mix });
+      else toast("At least one vehicle type needs a share above 0%.");
+    });
+    wrap.append(label, input);
+    box.append(wrap);
+  }
+}
+
+function updateMixLabels() {
+  const vals = state.types.map((t) => Number($(`mix-${t}`)?.value ?? 0));
+  const total = vals.reduce((a, b) => a + b, 0);
+  state.types.forEach((t, i) => {
+    const out = $(`mixout-${t}`);
+    if (out) out.textContent = total ? `${Math.round((100 * vals[i]) / total)}%` : "0%";
+  });
+}
+
 function configureSliders(limits) {
   $("sl-volume").max = limits.volume_vph[1];
+  if (limits.ped_rate_ph) $("sl-peds").max = limits.ped_rate_ph[1];
   $("sl-green").min = limits.green_s[0];
   $("sl-green").max = limits.green_s[1];
 }
@@ -176,10 +235,15 @@ const labels = {
   "sl-aggr": (v) => `${v < 0.34 ? "Timid" : v < 0.67 ? "Normal" : "Aggressive"} (${Number(v).toFixed(2)})`,
   "sl-green": (v) => {
     const L = state.limits;
-    return L ? `${v} s · cycle ${L.n_phases * (Number(v) + L.amber_s + L.all_red_s)} s` : `${v} s`;
+    if (!L) return `${v} s`;
+    const cycle = L.n_phases * (Number(v) + L.amber_s + L.all_red_s);
+    // An exclusive pedestrian phase, when called, adds WALK + clearance + all-red once per cycle.
+    const ped = L.walk_s + L.ped_clear_s + L.all_red_s;
+    return `${v} s · cycle ${cycle} s (+${Math.round(ped)} s with walkers)`;
   },
+  "sl-peds": (v) => `${Math.round(v)} per hour`,
 };
-const outputs = { "sl-volume": "out-volume", "sl-aggr": "out-aggr", "sl-green": "out-green" };
+const outputs = { "sl-volume": "out-volume", "sl-aggr": "out-aggr", "sl-green": "out-green", "sl-peds": "out-peds" };
 
 function setSlider(id, value) {
   const el = $(id);
@@ -188,7 +252,8 @@ function setSlider(id, value) {
   $(outputs[id]).textContent = labels[id](el.value);
 }
 
-for (const [id, key] of [["sl-volume", "volume_vph"], ["sl-aggr", "aggressiveness"], ["sl-green", "green_s"]]) {
+for (const [id, key] of [["sl-volume", "volume_vph"], ["sl-aggr", "aggressiveness"], ["sl-green", "green_s"],
+                         ["sl-peds", "ped_rate_ph"]]) {
   const el = $(id);
   el.addEventListener("input", () => { $(outputs[id]).textContent = labels[id](el.value); });
   // Send on release ("change"), not on every drag pixel: one validated command per adjustment.
@@ -223,7 +288,7 @@ function clock(t) { const s = Math.max(0, Math.floor(t)); return `${Math.floor(s
 
 // ------------------------------------------------------------------ render loop
 function loop(now) {
-  renderer.draw(frames.cur, frames.sample(now));
+  renderer.draw(frames.cur, frames.sample(now), frames.samplePeds(now), now);
   requestAnimationFrame(loop);
 }
 

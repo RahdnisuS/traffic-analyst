@@ -29,6 +29,9 @@
   --veh-moving: #2a78d6;
   --veh-queued: #ec835a;
   --veh-stopped: #d03b3b;
+  --sidewalk: #c9cbc2;
+  --ped: #7c3aed;
+  --ped-halo: #ffffff;
   --font: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 @media (prefers-color-scheme: dark) {
@@ -39,6 +42,7 @@
     --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
     --ground: #1f2420; --asphalt: #3a3c40; --marking: #d9d9d2; --median: #b89a2e;
     --veh-moving: #5598e7; --veh-queued: #ec835a; --veh-stopped: #e05252;
+    --sidewalk: #4a4d48; --ped: #b794f6; --ped-halo: #0d0d0d;
   }
 }
 :root[data-theme="dark"] {
@@ -48,6 +52,7 @@
   --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
   --ground: #1f2420; --asphalt: #3a3c40; --marking: #d9d9d2; --median: #b89a2e;
   --veh-moving: #5598e7; --veh-queued: #ec835a; --veh-stopped: #e05252;
+  --sidewalk: #4a4d48; --ped: #b794f6; --ped-halo: #0d0d0d;
 }
 
 * { box-sizing: border-box; }
@@ -83,6 +88,7 @@ h2 { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--ink-2); }
 .sw-moving { background: var(--veh-moving); }
 .sw-queued { background: var(--veh-queued); }
 .sw-stopped { background: var(--veh-stopped); }
+.sw-ped { background: var(--ped); border-radius: 50%; }
 
 .side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
@@ -106,6 +112,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .slider label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--ink-2); }
 .slider output { color: var(--ink); font-variant-numeric: tabular-nums; }
 .slider input { width: 100%; accent-color: var(--accent); margin: 6px 0 0; }
+.mix { border: 1px solid var(--border); border-radius: 8px; margin: 0; padding: 8px 10px 10px; min-width: 0; }
+.mix legend { font-size: 12px; color: var(--ink-2); padding: 0 4px; }
+.mix .hint { color: var(--muted); }
+.mix-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 14px; }
+.mix-grid .slider label { font-size: 12px; }
 
 .kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;

@@ -11,13 +11,15 @@ and the RL reward/observation (Phase 7), so every part of the system uses one
 definition of "queue" or "delay".
 
 Definitions:
-  queued vehicle  - on an inbound lane, moving slower than ``queue_speed`` (2 m/s)
+  queued vehicle  - on an approach lane (inbound or bike filter lane), moving slower than
+                    ``queue_speed`` (2 m/s)
   queue length    - metres from the stop line to the rear of the farthest-back queued vehicle
   delay           - travel time minus free-flow travel time ("control delay")
   Level of Service- HCM signalised-intersection bands on mean control delay:
                     A<=10s, B<=20, C<=35, D<=55, E<=80, F>80
   gridlock        - no vehicle has left the junction for ``gridlock_window_s`` while at least
                     ``gridlock_min_vehicles`` are present and >=90% of them are stopped
+  pedestrian wait - seconds a walker stood at the kerb before starting to cross
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ import numpy as np
 
 from .config import MetricsSettings
 from .engine import WAIT_SPEED
+from .pedestrian import PedState, PedTripRecord
 from .vehicle import TripRecord
 
 LOS_BANDS = ((10.0, "A"), (20.0, "B"), (35.0, "C"), (55.0, "D"), (80.0, "E"))
@@ -59,9 +62,9 @@ class LaneQueue:
 
 
 def lane_queues(sim, queue_speed: float) -> dict[str, LaneQueue]:
-    """Queue state of every inbound lane. Cheap enough to call every RL decision."""
+    """Queue state of every approach lane. Cheap enough to call every RL decision."""
     out: dict[str, LaneQueue] = {}
-    for e in sim.junction.inbound_edges():
+    for e in sim.junction.approach_edges():
         q = LaneQueue()
         for veh in sim.lanes[e.id]:
             q.vehicles += 1
@@ -106,8 +109,9 @@ class MetricsCollector:
         self.s = settings
         self.junction = sim.junction
         self.arms = sorted(sim.junction.inbound)
-        self.lane_ids = [e.id for e in sim.junction.inbound_edges()]
-        self.lane_arm = {e.id: e.arm for e in sim.junction.inbound_edges()}
+        self.lane_ids = [e.id for e in sim.junction.approach_edges()]
+        self.lane_arm = {e.id: e.arm for e in sim.junction.approach_edges()}
+        self.vtypes = sorted(sim.cfg.vehicle_types)
         self.phase_arms = {p.name: sorted(p.green) for p in sim.junction.phases}
         self.steps_per_sample = max(1, round(1.0 / sim.dt))
 
@@ -116,6 +120,8 @@ class MetricsCollector:
         self._arrivals = _Snapshots(dict(sim.spawner.arrivals_total), keep)
         self._prev_arrivals = dict(sim.spawner.arrivals_total)
         self._trip_window: deque[tuple[float, float]] = deque()  # (exit_time, delay)
+        self._ped_window: deque[tuple[float, float]] = deque()   # (cross_start, wait)
+        self._walk_idx = len(sim.peds.walk_log)
         self._sig_idx = 0
         self._ctl_idx = len(sim.control_events)
         self._last_green: dict[str, float | None] = {a: None for a in self.arms}
@@ -126,6 +132,8 @@ class MetricsCollector:
         self.history: deque[dict] = deque(maxlen=history_s)  # recent rows for live charts
         self.latest: dict | None = None
         self.trips: list[TripRecord] = []
+        self.ped_trips: list[PedTripRecord] = []
+        self.ped_waits: list[float] = []  # every crossing started, for the run summary
         self.event_counts: Counter = Counter()
         self.max_queue: dict[str, tuple[int, float]] = {a: (0, 0.0) for a in self.arms}
         self.columns = self._columns()
@@ -134,7 +142,10 @@ class MetricsCollector:
     def _columns(self) -> list[str]:
         cols = ["t", "clock", "phase", "stage", "time_in_stage", "in_network", "backlog",
                 "completed", "arrivals", "throughput_vph", "mean_speed", "stopped_frac",
-                "mean_wait_active", "max_wait_active", "mean_delay_window", "los", "queue_total"]
+                "mean_wait_active", "max_wait_active", "mean_delay_window", "los", "queue_total",
+                "ped_signal", "peds_in_network", "peds_waiting", "peds_crossing",
+                "ped_wait_window", "ped_longest_wait"]
+        cols += [f"veh_{t}" for t in self.vtypes]
         for a in self.arms:
             cols += [f"arrivals_{a}", f"queue_{a}", f"wait_{a}", f"backlog_{a}"]
         for lid in self.lane_ids:
@@ -142,13 +153,23 @@ class MetricsCollector:
         return cols
 
     # ------------------------------------------------------------------ observer hook
-    def after_step(self, sim) -> tuple[dict | None, list[dict], list[TripRecord]]:
-        """Returns (per-second row or None, new events, trips finished this step)."""
+    def after_step(self, sim) -> tuple[dict | None, list[dict], list[TripRecord], list[PedTripRecord]]:
+        """Returns (per-second row or None, new events, vehicle trips and pedestrian trips
+        finished this step)."""
         events: list[dict] = []
         trips = sim.recent_trips
         for tr in trips:
             self._trip_window.append((tr.exit_time, tr.delay))
             self.trips.append(tr)
+        ped_trips = sim.peds.recent_trips
+        self.ped_trips.extend(ped_trips)
+        for t0, wait in sim.peds.recent_starts:
+            self._ped_window.append((t0, wait))
+            self.ped_waits.append(wait)
+        for w in sim.peds.walk_log[self._walk_idx:]:
+            # Why the cycle just got longer, and for whom: the analyst can cite this.
+            events.append(self._event("ped_phase", w["t"], {"waiting": w["waiting"], "max_wait": w["max_wait"]}))
+        self._walk_idx = len(sim.peds.walk_log)
 
         new = sim.signals.events[self._sig_idx:]
         self._sig_idx = len(sim.signals.events)
@@ -168,7 +189,7 @@ class MetricsCollector:
             row = self._sample(sim, events)
             self.latest = row
             self.history.append(row)
-        return row, events, trips
+        return row, events, trips, ped_trips
 
     # ------------------------------------------------------------------ sampling
     def _sample(self, sim, events: list[dict]) -> dict:
@@ -176,7 +197,10 @@ class MetricsCollector:
         s = self.s
         while self._trip_window and self._trip_window[0][0] < t - s.window_s:
             self._trip_window.popleft()
+        while self._ped_window and self._ped_window[0][0] < t - s.window_s:
+            self._ped_window.popleft()
         mean_delay = float(np.mean([d for _, d in self._trip_window])) if self._trip_window else None
+        ped_wait = float(np.mean([w for _, w in self._ped_window])) if self._ped_window else None
 
         completed = sim.counters.completed
         self._completed.push(t, completed)
@@ -193,7 +217,7 @@ class MetricsCollector:
 
         row = {
             "t": round(t, 1), "clock": clock(t),
-            "phase": sim.signals.phase.name, "stage": sim.signals.stage.value,
+            "phase": sim.signals.phase_name, "stage": sim.signals.stage.value,
             "time_in_stage": round(sim.signals.time_in_stage, 1),
             "in_network": len(sim.vehicles), "backlog": sim.spawner.backlog_size(),
             "completed": completed,
@@ -206,9 +230,18 @@ class MetricsCollector:
             "mean_delay_window": round(mean_delay, 2) if mean_delay is not None else "",
             "los": los or "",
             "queue_total": sum(q.queued for q in lq.values()),
+            "ped_signal": sim.signals.ped_signal(),
+            "peds_in_network": len(sim.peds.peds),
+            "peds_waiting": sim.peds.count(PedState.WAIT),
+            "peds_crossing": sim.peds.count(PedState.CROSS),
+            "ped_wait_window": round(ped_wait, 2) if ped_wait is not None else "",
+            "ped_longest_wait": round(sim.peds.longest_wait(t), 1),
         }
+        by_type = Counter(v.vtype for v in sim.vehicles.values())
+        for vt in self.vtypes:
+            row[f"veh_{vt}"] = by_type.get(vt, 0)
         for a in self.arms:
-            lanes = [lq[lid] for lid in sim.junction.inbound[a]]
+            lanes = [lq[lid] for lid in sim.junction.approach_lanes(a)]
             n_veh = sum(q.vehicles for q in lanes)
             queued = sum(q.queued for q in lanes)
             row[f"arrivals_{a}"] = arrivals_now[a] - self._prev_arrivals[a]
@@ -343,6 +376,23 @@ class MetricsCollector:
             out["mean_travel_time_s"] = round(float(np.mean([x.travel_time for x in trips])), 2)
             out["mean_entry_delay_s"] = round(float(np.mean([x.entry_delay for x in trips])), 2)
             out["mean_stops"] = round(float(np.mean([x.stops for x in trips])), 2)
+        out["per_type"] = {vt: stats([x for x in trips if x.vtype == vt]) for vt in self.vtypes}
+        filtered = [x for x in trips if x.filtered]
+        if filtered:
+            out["per_type"]["bike"]["filtered_trips"] = len(filtered)
+            out["per_type"]["bike"]["filtered_mean_delay_s"] = round(float(np.mean([x.delay for x in filtered])), 2)
+        pw = np.array(self.ped_waits) if self.ped_waits else None
+        out["pedestrians"] = {
+            "spawned": sim.peds.spawned,
+            "completed": len(self.ped_trips),
+            "crossings_started": len(self.ped_waits),
+            "mean_wait_s": round(float(pw.mean()), 2) if pw is not None else None,
+            "p95_wait_s": round(float(np.percentile(pw, 95)), 2) if pw is not None else None,
+            "max_wait_s": round(float(pw.max()), 2) if pw is not None else None,
+            "mean_crossing_s": (round(float(np.mean([x.crossing_time for x in self.ped_trips])), 2)
+                                if self.ped_trips else None),
+            "ped_phases": sim.signals.ped_phases_served,
+        }
         out["per_approach"] = {
             a: {**stats([x for x in trips if x.origin == a]),
                 "max_queue": self.max_queue[a][0], "max_queue_t": self.max_queue[a][1],

@@ -15,6 +15,12 @@ function lerpAngle(a, b, t) {
   return a + d * t;
 }
 
+function byId(list) {
+  const map = new Map();
+  for (const v of list) map.set(v[0], v);
+  return map;
+}
+
 export class FrameBuffer {
   constructor() { this.clear(); }
 
@@ -30,17 +36,17 @@ export class FrameBuffer {
       const dt = Math.min(Math.max(now - this.cur.recv, 16), 250);
       this.interval = 0.8 * this.interval + 0.2 * dt;
     }
-    const map = new Map();
-    for (const v of frame.vehicles) map.set(v[0], v);
     this.prev = this.cur;
-    this.cur = { ...frame, recv: now, map };
+    this.cur = { ...frame, peds: frame.peds || [], recv: now, map: byId(frame.vehicles), pmap: byId(frame.peds || []) };
   }
+
+  #t(now) { return Math.min(Math.max((now - this.cur.recv) / this.interval, 0), 1); }
 
   /** Interpolated vehicle list: [id, x, y, heading, speed, typeIdx]. */
   sample(now) {
     if (!this.cur) return [];
     if (!this.prev) return this.cur.vehicles;
-    const t = Math.min(Math.max((now - this.cur.recv) / this.interval, 0), 1);
+    const t = this.#t(now);
     const out = new Array(this.cur.vehicles.length);
     let i = 0;
     for (const v of this.cur.vehicles) {
@@ -50,5 +56,16 @@ export class FrameBuffer {
                   lerpAngle(p[3], v[3], t), p[4] + (v[4] - p[4]) * t, v[5]];
     }
     return out;
+  }
+
+  /** Interpolated pedestrian list: [id, x, y, state]. */
+  samplePeds(now) {
+    if (!this.cur) return [];
+    if (!this.prev) return this.cur.peds;
+    const t = this.#t(now);
+    return this.cur.peds.map((q) => {
+      const p = this.prev.pmap.get(q[0]);
+      return p ? [q[0], p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t, q[3]] : q;
+    });
   }
 }

@@ -31,6 +31,7 @@
         <li><i class="sw sw-moving"></i>Moving</li>
         <li><i class="sw sw-queued"></i>Queued (&lt;2 m/s)</li>
         <li><i class="sw sw-stopped"></i>Stopped</li>
+        <li><i class="sw sw-ped"></i>Pedestrian</li>
       </ul>
     </section>
 
@@ -57,6 +58,14 @@
           <label for="sl-green">Green time per phase <output id="out-green" for="sl-green"></output></label>
           <input id="sl-green" type="range" min="7" max="90" step="1">
         </div>
+        <div class="slider">
+          <label for="sl-peds">Pedestrians <output id="out-peds" for="sl-peds"></output></label>
+          <input id="sl-peds" type="range" min="0" max="1200" step="20">
+        </div>
+        <fieldset class="mix">
+          <legend>Vehicle mix <span class="hint">relative weights</span></legend>
+          <div id="mix-sliders" class="mix-grid"></div>
+        </fieldset>
       </section>
 
       <section class="kpis" aria-label="Live metrics">
@@ -64,6 +73,8 @@
         <div class="kpi"><span class="kpi-label">Vehicles</span><span id="kpi-veh" class="kpi-value">0</span><span id="kpi-backlog" class="kpi-sub"></span></div>
         <div class="kpi"><span class="kpi-label">Throughput</span><span id="kpi-thru" class="kpi-value">–</span><span class="kpi-sub">veh/h, last 2 min</span></div>
         <div class="kpi"><span class="kpi-label">Mean delay</span><span id="kpi-delay" class="kpi-value">–</span><span id="kpi-los" class="los-badge" hidden></span></div>
+        <div class="kpi"><span class="kpi-label">Pedestrians</span><span id="kpi-peds" class="kpi-value">0</span><span id="kpi-peds-sub" class="kpi-sub">none waiting</span></div>
+        <div class="kpi"><span class="kpi-label">Pedestrian wait</span><span id="kpi-pwait" class="kpi-value">–</span><span class="kpi-sub">at the kerb, last 2 min</span></div>
       </section>
 
       <section class="card chart-card">

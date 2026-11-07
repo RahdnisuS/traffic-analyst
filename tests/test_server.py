@@ -43,13 +43,16 @@ def test_ws_init_then_play_advances_time(client):
     with client.websocket_connect("/ws/sim") as ws:
         init = ws.receive_json()
         assert init["type"] == "init" and init["playing"] is False
-        assert init["vehicle_types"] == ["car"] and init["limits"]["speeds"][-1] == 20.0
+        assert init["vehicle_types"] == ["auto", "bike", "bus", "car"] and init["limits"]["speeds"][-1] == 20.0
+        assert set(init["layout"]["crosswalks"]) == set("NESW")
         ws.send_json({"cmd": "speed", "value": 20})
         ws.send_json({"cmd": "play"})
         assert recv_until(ws, "status")["speed"] == 20.0
-        t0 = recv_until(ws, "frame")["t"]
+        frame = recv_until(ws, "frame")
+        t0 = frame["t"]
+        assert "peds" in frame and frame["ped_signal"] in ("walk", "flash", "dont_walk")
         rows = recv_until(ws, "metrics")["rows"]
-        assert rows and "queue_N" in rows[0]
+        assert rows and "queue_N" in rows[0] and "peds_waiting" in rows[0]
         assert recv_until(ws, "frame")["t"] > t0
 
 
@@ -69,12 +72,18 @@ def test_invalid_commands_return_errors_and_dont_crash(client):
 def test_settings_apply_and_reset_keeps_them(client):
     with client.websocket_connect("/ws/sim") as ws:
         ws.receive_json()
-        ws.send_json({"cmd": "settings", "volume_vph": 600, "aggressiveness": 0.8, "green_s": 30})
+        ws.send_json({"cmd": "settings", "volume_vph": 600, "aggressiveness": 0.8, "green_s": 30,
+                      "ped_rate_ph": 120, "vehicle_mix": {"car": 50, "bike": 50}})
         st = recv_until(ws, "status")["settings"]
-        assert st == {"volume_vph": 600.0, "aggressiveness": 0.8, "green_s": 30.0}
+        assert st == {"volume_vph": 600.0, "aggressiveness": 0.8, "green_s": 30.0, "ped_rate_ph": 120.0,
+                      "vehicle_mix": {"auto": 0.0, "bike": 50.0, "bus": 0.0, "car": 50.0}}
         ws.send_json({"cmd": "reset", "seed": 99})
         init = recv_until(ws, "init")
-        assert init["seed"] == 99 and init["settings"]["green_s"] == 30.0
+        assert init["seed"] == 99 and init["settings"] == st
+        ws.send_json({"cmd": "settings", "vehicle_mix": {"tractor": 10}})
+        assert "unknown vehicle types" in recv_until(ws, "error")["message"]
+        ws.send_json({"cmd": "settings", "vehicle_mix": {"car": 0}})
+        assert recv_until(ws, "error")["message"]
 
 
 def test_client_outbox_drops_stale_frames_but_keeps_reliable_messages():

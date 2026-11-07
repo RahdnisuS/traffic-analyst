@@ -8,11 +8,13 @@ sim:
   duration_s: 600         # default run length for the headless CLI
   junction: junctions/four_way_2x2.json
 
-# Car-following (IDM) parameters per vehicle type. Phase 4 adds bike/auto/bus.
+# Car-following (IDM) parameters per vehicle type. Values are typical of Indian urban traffic:
+# bikes (motorcycles/scooters) are quick and keep short gaps, autos (auto-rickshaws) are light
+# but low-powered, buses are long, heavy and slow to start. Bikes also filter between lanes.
 vehicle_types:
   car:
     length: 4.5           # m
-    width: 1.8            # m (used by renderers; lateral logic arrives in Phase 4)
+    width: 1.8            # m
     max_accel: 1.5        # IDM "a": comfortable max acceleration
     comfort_decel: 2.0    # IDM "b": comfortable braking
     max_decel: 8.0        # physical braking limit (clamps IDM in emergencies)
@@ -20,11 +22,43 @@ vehicle_types:
     time_headway: 1.5     # IDM "T": desired time gap to the leader
     min_gap: 2.0          # IDM "s0": bumper-to-bumper gap when stopped
     accel_exponent: 4.0   # IDM "delta": how sharply acceleration drops near v0
+  bike:
+    length: 2.0
+    width: 0.8
+    max_accel: 2.5        # light and powerful for its weight: first away from the line
+    comfort_decel: 2.5
+    max_decel: 7.0
+    desired_speed: 13.9
+    time_headway: 1.0     # riders follow closely
+    min_gap: 1.0
+    accel_exponent: 4.0
+    filters: true         # rides the gap between queued vehicles to the front
+  auto:
+    length: 2.9
+    width: 1.4
+    max_accel: 1.0        # small engine: slow off the line
+    comfort_decel: 1.8
+    max_decel: 6.0
+    desired_speed: 11.1   # 40 km/h
+    time_headway: 1.3
+    min_gap: 1.5
+    accel_exponent: 4.0
+  bus:
+    length: 12.0
+    width: 2.6
+    max_accel: 0.8        # heavy: the slowest to clear a junction
+    comfort_decel: 1.5
+    max_decel: 5.0
+    desired_speed: 11.1
+    time_headway: 1.8     # a long vehicle needs more stopping margin
+    min_gap: 3.0
+    accel_exponent: 4.0
+    kerb_lane: true       # buses keep left, near the kerb (where the bus stops are)
 
 demand:
   per_approach_vph: {N: 450, E: 350, S: 450, W: 350}
   turn_probabilities: {left: 0.25, straight: 0.55, right: 0.20}
-  vehicle_mix: {car: 1.0}
+  vehicle_mix: {car: 0.35, bike: 0.45, auto: 0.15, bus: 0.05}  # weights, normalised; two-wheelers dominate Indian traffic
   speed_factor_std: 0.08  # driver heterogeneity: v0 is scaled by N(1, std), clipped
 
 driver:
@@ -41,6 +75,32 @@ intersection:
   turn_lateral_accel: 2.5 # m/s^2; turn speed = sqrt(a_lat * radius)
   lookahead_m: 150        # how far ahead a driver scans for a leader across edges
   conflict_distance_m: 2.5 # two turning paths closer than this are treated as conflicting
+  filter_speed: 5.5       # m/s; bikes squeezing past queued (near-stationary) vehicles ride slowly (~20 km/h)
+  filter_conflict_distance_m: 1.5 # bike paths only: a 0.8 m bike fits beside a car 1.75 m away
+  filter_trigger_gap: 12  # m; a bike starts filtering once a slow (queued) leader is this close
+  lateral_speed: 1.2      # m/s sideways while moving into the filter gap (smooths the drawing)
+
+# Pedestrians: social force model (Helbing & Molnar 1995). Each walker is pulled towards their
+# goal and pushed away from other people and from kerbs. Crossings run an exclusive, on-demand
+# pedestrian phase: pressing the button adds WALK + flashing DON'T WALK, with all traffic held red.
+pedestrians:
+  rate_ph: 300            # arrivals per hour across all four crosswalks
+  desired_speed_mean: 1.34 # m/s (typical free walking speed)
+  desired_speed_std: 0.26
+  radius: 0.25            # m, body radius
+  relaxation_time: 0.5    # tau (s): how fast a walker adjusts to their desired velocity
+  repulsion_strength: 2.5 # A (m/s^2): push between two people at contact
+  repulsion_range: 0.3    # B (m): how quickly that push fades with distance
+  anisotropy: 0.35        # lambda: someone behind you matters 35% as much as someone ahead
+  anticipation_s: 0.5     # look-ahead of the elliptical spec: react to where people WILL be (0 = circular)
+  wall_strength: 5.0      # kerbs and crosswalk edges push walkers back
+  wall_range: 0.1
+  max_speed_factor: 1.3   # nobody walks faster than 1.3x their own desired speed
+  walk_s: 7               # WALK interval (s); 7 s is the MUTCD minimum
+  min_greens_between: 4   # vehicle greens between pedestrian phases: 4 = at most once per cycle.
+                          # 1 would serve walkers after every phase, but costs vehicles ~1/3 of the clock
+  clearance_speed: 1.07   # m/s (3.5 ft/s, MUTCD); flashing DON'T WALK = crossing length / this
+  sidewalk_approach_m: 18 # walkers appear (and leave) this far up the sidewalk
 
 metrics:
   queue_speed: 2.0        # m/s; slower than this on an inbound lane = queued (HCM uses ~5 mph)

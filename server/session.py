@@ -30,7 +30,8 @@ from sim.engine import Simulation
 from sim.logger import RunLogger
 from sim.metrics import MetricsCollector
 
-from .schemas import GREEN_MAX_S, SPEEDS, VOLUME_MAX_VPH, PauseCmd, PlayCmd, ResetCmd, SettingsCmd, SpeedCmd
+from .schemas import (GREEN_MAX_S, PED_RATE_MAX, SPEEDS, VOLUME_MAX_VPH, PauseCmd, PlayCmd, ResetCmd,
+                      SettingsCmd, SpeedCmd)
 
 log = logging.getLogger("traffic.session")
 
@@ -124,9 +125,9 @@ class SimSession:
 
     # ------------------------------------------------------------------ observer
     def after_step(self, sim) -> None:
-        row, events, trips = self.collector.after_step(sim)
+        row, events, trips, ped_trips = self.collector.after_step(sim)
         if self.logger:
-            self.logger.record(row, events, trips)
+            self.logger.record(row, events, trips, ped_trips)
         if row is not None:
             self._pending_rows.append(row)
         self._pending_events.extend(events)
@@ -137,7 +138,11 @@ class SimSession:
         greens = getattr(sim.policy, "green_times", None)
         return {"volume_vph": round(sim.mean_volume_vph(), 1),
                 "aggressiveness": sim.cfg.driver.aggressiveness,
-                "green_s": greens[0] if greens else None}
+                "green_s": greens[0] if greens else None,
+                # As percentages, which is what the sliders show.
+                "vehicle_mix": {t: round(100 * w / sum(sim.cfg.demand.vehicle_mix.values()), 1)
+                                for t, w in sorted(sim.cfg.demand.vehicle_mix.items())},
+                "ped_rate_ph": sim.cfg.pedestrians.rate_ph}
 
     def status(self) -> dict:
         return {"type": "status", "playing": self.playing, "speed": self.speed, "seed": self.sim.seed,
@@ -153,8 +158,11 @@ class SimSession:
             "vehicle_types": sorted(self.sim.cfg.vehicle_types),
             "vehicle_dims": {k: [p.length, p.width] for k, p in sorted(self.sim.cfg.vehicle_types.items())},
             "limits": {"volume_vph": [0, VOLUME_MAX_VPH], "green_s": [sig.min_green_s, GREEN_MAX_S],
+                       "ped_rate_ph": [0, PED_RATE_MAX],
                        "speeds": list(SPEEDS), "amber_s": sig.amber_s, "all_red_s": sig.all_red_s,
-                       "n_phases": n},
+                       "n_phases": n, "walk_s": self.sim.cfg.pedestrians.walk_s,
+                       "ped_clear_s": self.sim.ped_clear_s},
+            "ped_radius": self.sim.cfg.pedestrians.radius,
             "history": list(self.collector.history)[-HISTORY_ON_CONNECT:],
             "events": list(self.recent_events),
             **{k: v for k, v in self.status().items() if k != "type"},
@@ -194,7 +202,8 @@ class SimSession:
             self._broadcast(self.init_message())
         elif isinstance(cmd, SettingsCmd):
             self.sim.apply_settings(volume_vph=cmd.volume_vph, aggressiveness=cmd.aggressiveness,
-                                    green_s=cmd.green_s, source="dashboard")
+                                    green_s=cmd.green_s, vehicle_mix=cmd.vehicle_mix,
+                                    ped_rate_ph=cmd.ped_rate_ph, source="dashboard")
         self._broadcast(self.status())
 
     # ------------------------------------------------------------------ main loop
@@ -206,15 +215,19 @@ class SimSession:
             lane = sim.lanes[eid]
             if not lane:
                 continue
-            xs, ys, hs = sim.junction.edges[eid].path.poses_at([v.s for v in lane])
+            xs, ys, hs = sim.lane_poses(eid)
             for veh, x, y, h in zip(lane, xs, ys, hs):
                 # Compact arrays instead of dicts: ~3x smaller on the wire at 20 Hz.
                 vehicles.append([veh.id, round(float(x), 2), round(float(y), 2),
                                  round(float(h), 3), round(veh.v, 2), tindex[veh.vtype]])
-        return {"type": "frame", "t": round(sim.time, 2), "phase": sim.signals.phase.name,
+        # Pedestrians: [id, x, y, state] with state 0 approach, 1 wait, 2 cross, 3 leave.
+        peds = [[p.id, round(float(p.pos[0]), 2), round(float(p.pos[1]), 2), int(p.state)]
+                for p in sim.peds.peds]
+        return {"type": "frame", "t": round(sim.time, 2), "phase": sim.signals.phase_name,
                 "stage": sim.signals.stage.value,
                 "signals": sim.signals.arm_states(sim.junction.inbound),
-                "backlog": sim.spawner.backlog_size(), "vehicles": vehicles}
+                "ped_signal": sim.signals.ped_signal(),
+                "backlog": sim.spawner.backlog_size(), "vehicles": vehicles, "peds": peds}
 
     def tick(self, period: float) -> None:
         """Advance the sim by one wall-clock tick and push updates. Synchronous and fast."""

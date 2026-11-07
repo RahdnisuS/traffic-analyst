@@ -124,3 +124,26 @@ def test_no_gridlock_in_normal_operation(cfg, tmp_path):
     with RunLogger(sim, runs_dir=tmp_path) as log:
         sim.run(600)
     assert not [e for e in read_events(log.dir) if e["type"] == "gridlock"]
+
+
+def test_pedestrians_and_vehicle_types_are_logged(cfg, tmp_path):
+    sim = Simulation(cfg, seed=9)
+    with RunLogger(sim, runs_dir=tmp_path) as log:
+        sim.run(600)
+    d = log.dir
+    manifest = json.loads((d / "manifest.json").read_text())
+    peds = list(csv.DictReader(open(d / "peds.csv")))
+    summ = manifest["summary"]
+    assert manifest["schema_version"] == 2 and manifest["files"]["pedestrians"] == "peds.csv"
+    assert peds and len(peds) == summ["pedestrians"]["completed"] == sim.peds.completed
+    assert all(float(p["wait_time"]) >= 0 and float(p["crossing_time"]) > 0 for p in peds)
+    assert set(summ["per_type"]) == {"auto", "bike", "bus", "car"}
+    trips = list(csv.DictReader(open(d / "trips.csv")))
+    assert {t["vtype"] for t in trips} == {"auto", "bike", "bus", "car"}
+    events = read_events(d)
+    ped_events = [e for e in events if e["type"] == "ped_phase"]
+    assert len(ped_events) == summ["pedestrians"]["ped_phases"] > 0
+    walks = [e for e in events if e["type"] == "phase_change" and e["stage"] == "walk"]
+    assert [e["phase"] for e in walks] == ["PED"] * len(ped_events)
+    rows = list(csv.DictReader(open(d / "metrics.csv")))
+    assert {"ped_signal", "peds_waiting", "veh_bike", "q_flt_N_0"} <= set(rows[0])

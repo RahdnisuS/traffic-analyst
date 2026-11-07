@@ -86,11 +86,17 @@ Phase 14 – Unit tests (IDM, signal logic, scenario parser, retrieval), error h
 | 2026-11-07 | 1 | 4-phase split signalling: one approach green at a time. |
 | 2026-11-07 | 1 | Lane counts come from the junction JSON (default 2 in + 2 out per arm). |
 | 2026-11-07 | 1 | Repo root is the project root (no `traffic-analyst/` subfolder). Python 3.13 venv at `.venv`. |
-| 2026-11-07 | 4 | Pedestrian crossings use an **on-demand pedestrian phase**: pedestrians press to call a dedicated walk phase, which the signal controller serves within the normal cycle (subject to min-green on the current phase). |
+| 2026-11-07 | 4 | Pedestrian crossings use an **exclusive, on-demand pedestrian phase**: a waiting pedestrian presses the button; at the next phase change the controller inserts WALK (7 s) + flashing DON'T WALK (crossing length / 1.07 m/s ≈ 13 s) + all-red, with every vehicle movement red. The current green is never cut short. |
+| 2026-11-07 | 4 | The pedestrian phase runs **at most once per cycle** (`pedestrians.min_greens_between: 4`). Serving it after every phase gave vehicles only 51% green time. Trade-off: walkers wait ~60 s on average. |
+| 2026-11-07 | 4 | Default vehicle mix: 35% car, 45% bike, 15% auto, 5% bus. Buses prefer the kerb lane when it has room. |
+| 2026-11-07 | 4 | Bike filtering uses **virtual filter lanes** along the lane dividers (plus matching exit-side gaps), not a full sub-lane model: it reuses the 1-D lane machinery. Bikes filter only when queued behind slow traffic, only for movements whose path out of the gap crosses no neighbouring lane (straight-only on the default layout), and ride at 5.5 m/s only while alongside a queue. |
+| 2026-11-07 | 4 | Pedestrians use the social force model, **elliptical specification** (Johansson, Helbing & Shukla 2007), with 0.5 s anticipation; the circular version let head-on walkers overlap. Vehicles are not force sources: walker/vehicle separation is by rules (start only on WALK with the crosswalk clear; drivers yield to anyone on it). |
+| 2026-11-07 | 4 | Diagonal crossing during the exclusive phase is not modelled (adjacent crosswalks only), which keeps the clearance interval at ~13 s instead of ~22 s. |
 
 ## Status
 
 - [x] Phase 1 – Core sim
 - [x] Phase 2 – Metrics and logging
 - [x] Phase 3 – Web dashboard
-- [ ] Phase 4 – Mixed traffic and pedestrians (next)
+- [x] Phase 4 – Mixed traffic and pedestrians
+- [ ] Phase 5 – 2.5D renderer (next)

@@ -6,7 +6,8 @@ Layout of one run directory:
   metrics.csv    - one row per simulated second (see MetricsCollector.columns)
   events.jsonl   - one JSON object per line: phase changes, queue spikes,
                    spillback, gridlock, LOS changes (episodes have start + end)
-  trips.csv      - one row per completed vehicle trip
+  trips.csv      - one row per completed vehicle trip (with vehicle type)
+  peds.csv       - one row per completed pedestrian trip (kerb wait, crossing time)
 
 WHY these formats: CSV loads directly into pandas/LightGBM (Phase 9). JSONL
 is append-only, so a crash loses at most the last line, and each line is
@@ -27,9 +28,10 @@ from pathlib import Path
 
 from .config import PROJECT_ROOT
 from .metrics import MetricsCollector
+from .pedestrian import PedTripRecord
 from .vehicle import TripRecord
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # 2: Phase 4 added vehicle types, pedestrians, peds.csv and the PED phase
 
 METRIC_DEFINITIONS = {
     "queued_vehicle": "vehicle on an inbound lane moving slower than metrics.queue_speed (m/s)",
@@ -43,7 +45,15 @@ METRIC_DEFINITIONS = {
     "spillback": "episode while a lane's queue tail is beyond spillback_on_frac of the lane length",
     "config_change": "a setting changed mid-run (e.g. a dashboard slider); 'changes' lists the new values",
     "gridlock": "episode while no vehicle has exited for gridlock_window_s and >= gridlock_stopped_frac are stopped",
-    "wait_<arm>": "mean accumulated wait of vehicles currently on that approach's inbound lanes",
+    "wait_<arm>": "mean accumulated wait of vehicles currently on that approach's lanes (incl. bike filter lane)",
+    "filter_lane": "flt_<arm>_<k>: virtual bike lane on the divider between inbound lanes k and k+1",
+    "filtered": "trips.csv: the bike rode a filter lane past queued vehicles to the stop line",
+    "PED": "phase name during the exclusive pedestrian phase: every vehicle movement is red",
+    "ped_signal": "walk | flash (flashing DON'T WALK: finish crossing, don't start) | dont_walk",
+    "ped_phase": "event when a pedestrian phase starts: 'waiting' walkers, longest 'max_wait' (s)",
+    "ped_wait": "seconds a pedestrian stood at the kerb before starting to cross",
+    "ped_wait_window": "mean ped_wait of crossings started in the rolling window",
+    "veh_<type>": "vehicles of that type currently in the network",
 }
 
 
@@ -105,7 +115,8 @@ class RunLogger:
                          "spec": sim.junction.spec.model_dump(mode="json")},
             "config": cfg.model_dump(mode="json"),
             "metric_definitions": METRIC_DEFINITIONS,
-            "files": {"metrics": "metrics.csv", "events": "events.jsonl", "trips": "trips.csv"},
+            "files": {"metrics": "metrics.csv", "events": "events.jsonl", "trips": "trips.csv",
+                      "pedestrians": "peds.csv"},
             "summary": None,
         }
         _write_json_atomic(self.dir / "manifest.json", self.manifest)
@@ -118,6 +129,10 @@ class RunLogger:
         self._trips = csv.DictWriter(self._trips_fh,
                                      fieldnames=[f.name for f in dataclasses.fields(TripRecord)])
         self._trips.writeheader()
+        self._peds_fh = open(self.dir / "peds.csv", "w", newline="", encoding="utf-8")
+        self._peds = csv.DictWriter(self._peds_fh,
+                                    fieldnames=[f.name for f in dataclasses.fields(PedTripRecord)])
+        self._peds.writeheader()
         self.closed = False
         if attach:
             sim.observers.append(self)
@@ -133,10 +148,13 @@ class RunLogger:
     def after_step(self, sim) -> None:
         self.record(*self.collector.after_step(sim))
 
-    def record(self, row: dict | None, events: list[dict], trips: list[TripRecord]) -> None:
+    def record(self, row: dict | None, events: list[dict], trips: list[TripRecord],
+               ped_trips: list[PedTripRecord] = ()) -> None:
         self._write_events(events)
         for tr in trips:
             self._trips.writerow(dataclasses.asdict(tr))
+        for pt in ped_trips:
+            self._peds.writerow(dataclasses.asdict(pt))
         if row is not None:
             self._metrics.writerow(row)
 
@@ -149,7 +167,7 @@ class RunLogger:
         if self.closed:
             return self.manifest
         self._write_events(self.collector.flush_open_episodes(self.sim))
-        for fh in (self._metrics_fh, self._events_fh, self._trips_fh):
+        for fh in (self._metrics_fh, self._events_fh, self._trips_fh, self._peds_fh):
             fh.close()
         if self in self.sim.observers:
             self.sim.observers.remove(self)
@@ -165,7 +183,7 @@ class RunLogger:
     def discard(self) -> None:
         """Delete this run's directory (used for trivially short dashboard runs, e.g. a
         reset two seconds after starting), so data/runs/ isn't cluttered with noise."""
-        for fh in (self._metrics_fh, self._events_fh, self._trips_fh):
+        for fh in (self._metrics_fh, self._events_fh, self._trips_fh, self._peds_fh):
             fh.close()
         if self in self.sim.observers:
             self.sim.observers.remove(self)

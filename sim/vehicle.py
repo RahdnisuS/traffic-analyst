@@ -46,6 +46,11 @@ class Vehicle:
     free_flow_time: float = 0.0   # time the route would take at desired speed, no interference
     stops: int = 0                # number of separate times the vehicle came to a halt
     is_stopped: bool = False
+    filtered: bool = False        # a bike that moved into a filter lane during this trip
+    # Sideways offset (m, + = driver's left) from the lane centreline. Only the DRAWING uses it:
+    # when a bike moves into the filter gap it switches lanes logically at once, and this offset
+    # (starting at the old lane's position) shrinks to 0 so the move looks like a smooth swerve.
+    lat_shift: float = 0.0
 
     @property
     def edge_id(self) -> str:
@@ -79,3 +84,4 @@ class TripRecord:
     wait_time: float
     delay: float
     stops: int
+    filtered: bool = False        # bikes: rode the filter gap to the front of the queue

@@ -6,6 +6,9 @@
 
 const QUEUE_SPEED = 2.0;  // matches metrics.queue_speed
 const STOP_SPEED = 0.1;   // matches the engine's WAIT_SPEED
+const PED_MIN_PX = 2.4;   // pedestrians are 0.5 m wide: at "fit" zoom that is under a pixel, so
+                          // they get a minimum on-screen radius (a debug view should show them)
+const PED_WAIT = 1, PED_CROSS = 2;
 
 function css(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -30,12 +33,15 @@ export class Renderer2D {
     this.c = {
       ground: css("--ground"), asphalt: css("--asphalt"), marking: css("--marking"), median: css("--median"),
       moving: css("--veh-moving"), queued: css("--veh-queued"), stopped: css("--veh-stopped"),
+      sidewalk: css("--sidewalk"), ped: css("--ped"), pedHalo: css("--ped-halo"),
     };
   }
 
-  setLayout(layout, vehicleDims) {
+  setLayout(layout, vehicleDims, vehicleTypes = [], pedRadius = 0.25) {
     this.layout = layout;
     this.dims = vehicleDims;
+    this.types = vehicleTypes;
+    this.pedRadius = pedRadius;
     let ext = 0;
     for (const e of Object.values(layout.edges)) for (const [x, y] of e.points) ext = Math.max(ext, Math.abs(x), Math.abs(y));
     this.extent = ext;
@@ -96,7 +102,7 @@ export class Renderer2D {
     return arms;
   }
 
-  draw(frame, vehicles) {
+  draw(frame, vehicles, peds = [], now = 0) {
     const { ctx } = this;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = this.c.ground;
@@ -107,9 +113,69 @@ export class Renderer2D {
     // World (metres, y up) -> device pixels.
     ctx.setTransform(this.dpr * s, 0, 0, -this.dpr * s,
                      this.dpr * (this.w / 2 - this.pan.x * s), this.dpr * (this.h / 2 + this.pan.y * s));
+    this.#drawSidewalks();
     this.#drawRoads();
     this.#drawSignals(frame?.signals);
+    this.#drawPedSignals(frame?.ped_signal, now);
     this.#drawVehicles(vehicles);
+    this.#drawPeds(peds, s);
+  }
+
+  /** World point from a crosswalk's own axes: along the arm (u) and across it (n). */
+  #pt(cw, along, across) { return [cw.u[0] * along + cw.n[0] * across, cw.u[1] * along + cw.n[1] * across]; }
+
+  #quad(cw, a0, a1, b0, b1) {
+    const { ctx } = this;
+    const pts = [this.#pt(cw, a0, b0), this.#pt(cw, a1, b0), this.#pt(cw, a1, b1), this.#pt(cw, a0, b1)];
+    ctx.beginPath();
+    ctx.moveTo(...pts[0]);
+    for (const p of pts.slice(1)) ctx.lineTo(...p);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  #drawSidewalks() {
+    // A sidewalk strip along both kerbs of every arm, from the junction box outwards.
+    const L = this.layout, sw = L.sidewalk_width ?? 3;
+    this.ctx.fillStyle = this.c.sidewalk;
+    for (const cw of Object.values(L.crosswalks ?? {})) {
+      this.#quad(cw, cw.u0, this.extent, cw.hi, cw.hi + sw);
+      this.#quad(cw, cw.u0, this.extent, cw.lo - sw, cw.lo);
+    }
+  }
+
+  #drawPedSignals(state, now) {
+    // A small pedestrian head at both kerbs of every crosswalk. Flashing DON'T WALK blinks at 1 Hz.
+    if (!state) return;
+    const { ctx } = this;
+    const on = state === "walk" ? "#22c55e" : state === "flash" ? (Math.floor(now / 500) % 2 ? "#f5b301" : "#1b1b1b") : "#e5484d";
+    for (const cw of Object.values(this.layout.crosswalks ?? {})) {
+      for (const across of [cw.hi + 0.9, cw.lo - 0.9]) {
+        const [x, y] = this.#pt(cw, cw.u1 + 0.6, across);
+        ctx.fillStyle = "#1b1b1b";
+        ctx.fillRect(x - 0.75, y - 0.75, 1.5, 1.5);
+        ctx.fillStyle = on;
+        ctx.fillRect(x - 0.5, y - 0.5, 1.0, 1.0);
+      }
+    }
+  }
+
+  #drawPeds(peds, scale) {
+    if (!peds.length) return;
+    const { ctx } = this;
+    const r = Math.max(this.pedRadius, PED_MIN_PX / scale);
+    for (const [, x, y, st] of peds) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, 2 * Math.PI);
+      ctx.fillStyle = this.c.ped;
+      ctx.fill();
+      if (st === PED_WAIT || st === PED_CROSS) {
+        // Halo: waiting at the kerb or on the road, i.e. the walkers the signal is serving.
+        ctx.lineWidth = r * 0.45;
+        ctx.strokeStyle = this.c.pedHalo;
+        ctx.stroke();
+      }
+    }
   }
 
   #drawRoads() {
@@ -133,7 +199,8 @@ export class Renderer2D {
     ctx.setLineDash([3, 3]);
     const groups = {};
     for (const [id, e] of Object.entries(L.edges)) {
-      if (e.kind === "connector") continue;
+      // Filter lanes (flt_*, oflt_*) run along the dividers themselves: no extra markings.
+      if (e.kind === "connector" || e.kind === "filter" || id.startsWith("oflt_")) continue;
       (groups[`${e.kind}_${e.arm}`] ??= []).push([Number(id.split("_").pop()), e]);
     }
     for (const lanes of Object.values(groups)) {
@@ -206,17 +273,31 @@ export class Renderer2D {
   }
 
   #drawVehicles(vehicles) {
+    // Colour shows speed state; size and a simple mark show the type, so both read at once.
     const { ctx } = this;
     for (const [, x, y, h, v, ti] of vehicles) {
       const [len, wid] = this.dims[ti] || [4.5, 1.8];
+      const type = this.types[ti];
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(h);
       // Position is the FRONT bumper, so the body extends backwards along -heading.
       ctx.fillStyle = v < STOP_SPEED ? this.c.stopped : v < QUEUE_SPEED ? this.c.queued : this.c.moving;
       ctx.fillRect(-len, -wid / 2, len, wid);
-      ctx.fillStyle = "rgba(255,255,255,0.55)"; // windscreen marks the front
-      ctx.fillRect(-1.3, -wid / 2 + 0.25, 0.5, wid - 0.5);
+      if (type === "bike") {
+        ctx.fillStyle = "rgba(20,20,20,0.75)"; // rider's helmet
+        ctx.beginPath(); ctx.arc(-len * 0.55, 0, wid * 0.42, 0, 2 * Math.PI); ctx.fill();
+      } else if (type === "auto") {
+        ctx.fillStyle = "rgba(20,20,20,0.55)"; // canopy over the rear two-thirds
+        ctx.fillRect(-len * 0.95, -wid / 2 + 0.15, len * 0.6, wid - 0.3);
+      } else if (type === "bus") {
+        ctx.fillStyle = "rgba(255,255,255,0.55)"; // window strip along each side
+        ctx.fillRect(-len + 0.8, -wid / 2 + 0.2, len - 1.8, 0.35);
+        ctx.fillRect(-len + 0.8, wid / 2 - 0.55, len - 1.8, 0.35);
+      } else {
+        ctx.fillStyle = "rgba(255,255,255,0.55)"; // windscreen marks the front
+        ctx.fillRect(-1.3, -wid / 2 + 0.25, 0.5, wid - 0.5);
+      }
       ctx.restore();
     }
   }

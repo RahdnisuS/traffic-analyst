@@ -40,6 +40,10 @@ class VehicleTypeParams(_Strict):
     time_headway: float = Field(gt=0)     # IDM T
     min_gap: float = Field(ge=0)          # IDM s0
     accel_exponent: float = Field(4.0, gt=0)  # IDM delta
+    # Behaviour flags (Phase 4). Size and IDM numbers alone already make a bus sluggish and a
+    # bike nippy; these two capture the lane behaviour that differs by type on Indian roads.
+    filters: bool = False         # may ride the gap between lanes to the front of a queue (bikes)
+    kerb_lane: bool = False       # prefers the kerb-side lane when it has room (buses)
 
     @model_validator(mode="after")
     def _braking_order(self) -> "VehicleTypeParams":
@@ -96,6 +100,32 @@ class IntersectionSettings(_Strict):
     turn_lateral_accel: float = Field(2.5, gt=0)
     lookahead_m: float = Field(150.0, gt=0)
     conflict_distance_m: float = Field(2.5, gt=0)
+    filter_speed: float = Field(5.5, gt=0)        # m/s cap while squeezing past queued vehicles
+    filter_conflict_distance_m: float = Field(1.5, gt=0)  # bike paths: narrower vehicle, smaller margin
+    filter_trigger_gap: float = Field(12.0, gt=0)  # a bike starts filtering when a slow leader is this close
+    lateral_speed: float = Field(1.2, gt=0)       # m/s sideways when changing into the filter lane (visual)
+
+
+class PedestrianSettings(_Strict):
+    """Social force model parameters (Helbing & Molnar 1995) plus demand and signal timing."""
+    rate_ph: float = Field(300.0, ge=0)            # arrivals per hour, all crosswalks together
+    desired_speed_mean: float = Field(1.34, gt=0)  # m/s, typical free walking speed
+    desired_speed_std: float = Field(0.26, ge=0)
+    radius: float = Field(0.25, gt=0)              # body radius (m)
+    relaxation_time: float = Field(0.5, gt=0)      # tau: how quickly a walker reaches its desired velocity
+    repulsion_strength: float = Field(2.5, gt=0)   # A (m/s^2): push between two people at contact
+    repulsion_range: float = Field(0.3, gt=0)      # B (m): how fast that push fades with distance
+    anisotropy: float = Field(0.35, ge=0, le=1)    # lambda: people react less to someone behind them
+    anticipation_s: float = Field(0.5, ge=0)       # elliptical spec look-ahead (0 = circular model)
+    wall_strength: float = Field(5.0, gt=0)        # kerbs and crosswalk edges
+    wall_range: float = Field(0.1, gt=0)
+    max_speed_factor: float = Field(1.3, ge=1)     # cap on |v| relative to desired speed
+    walk_s: float = Field(7.0, gt=0)               # WALK interval (MUTCD minimum is 7 s)
+    min_greens_between: int = Field(4, ge=1)       # vehicle greens between two pedestrian phases
+                                                   # (= number of phases: at most once per cycle)
+    clearance_speed: float = Field(1.07, gt=0)     # m/s design walking speed for the flashing
+                                                   # DON'T WALK interval (MUTCD 3.5 ft/s)
+    sidewalk_approach_m: float = Field(18.0, gt=0) # how far up the sidewalk people appear / vanish
 
 
 class MetricsSettings(_Strict):
@@ -131,6 +161,7 @@ class Config(_Strict):
     driver: DriverSettings = DriverSettings()
     signals: SignalSettings = SignalSettings()
     intersection: IntersectionSettings = IntersectionSettings()
+    pedestrians: PedestrianSettings = PedestrianSettings()
     metrics: MetricsSettings = MetricsSettings()
     logging: LoggingSettings = LoggingSettings()
 
