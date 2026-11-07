@@ -8,3 +8,4 @@ data/runs/
 chroma/
 rl/models/*.zip
 .claude/
+skills-lock.json
