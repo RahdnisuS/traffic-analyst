@@ -22,7 +22,7 @@ pytest -q                           # all tests
 pytest tests/test_idm.py::test_name # single test
 ```
 
-`tests/conftest.py` puts the repo root on `sys.path`, so run pytest from the root.
+`tests/conftest.py` puts the repo root on `sys.path`, so run pytest from the root. In the Bash tool the venv activation doesn't persist between calls; call `.venv/Scripts/python -m pytest -q` (or `-m sim`, `-m server`) directly.
 
 ## Architecture
 
@@ -36,9 +36,10 @@ pytest tests/test_idm.py::test_name # single test
 - **Signals**: `SignalController` (`sim/signals.py`) owns the green → amber → all-red stages and enforces `min_green_s`. It also inserts the exclusive pedestrian phase (WALK → PED_CLEAR → all-red, phase name `"PED"`) when called, at most once every `min_greens_between` greens. Use `signals.phase_name` for display/logs (`signals.phase` is the last vehicle phase). Policies implement the `SignalPolicy` protocol (`update(controller, sim)`) and can only *request* switches; `FixedTimePolicy` is the current one. The RL agent is meant to plug in as another policy and respect the same min-green floor.
 - **Observers**: `MetricsCollector` (`sim/metrics.py`) samples queues, delay, throughput and LOS, and detects episodes (queue spike, spillback, gridlock) with on/off hysteresis. `MetricsCollector.after_step()` returns `(row, events, trips, ped_trips)`. `RunLogger` (`sim/logger.py`) writes `data/runs/<timestamp>_<controller>_s<seed>/` containing `manifest.json` (schema v2), `metrics.csv`, `trips.csv`, `peds.csv` and `events.jsonl`. These logs are what later phases (predictor, RAG) consume.
 - **Server** (`server/`): one shared `SimSession` is advanced by a single asyncio task at 20 Hz using a "time debt" so speed is exact on average; it drops debt rather than spiralling when it falls behind. Each client has an outbox where position frames are latest-wins and metrics/events are reliable and ordered. The same collector output feeds both the logger and the browsers, so the dashboard and logs always agree. Client commands are Pydantic models in `server/schemas.py`. REST: `/api/health`, `/api/layout`, `/api/runs`, `/api/runs/{id}`; WebSocket: `/ws/sim`; `web/` is served statically at `/`.
-- **Frontend** (`web/`): plain JS, no build step. `interp.js` interpolates between the two latest frames (entity interpolation), `render2d.js` draws on a canvas, and `charts.js` draws the live charts.
+- **Frontend** (`web/`): plain JS, no build step. `interp.js` interpolates between the two latest frames (entity interpolation) for vehicles and pedestrians, `render2d.js` draws on a canvas, and `charts.js` draws the live charts. Renderers only consume server state, so a new renderer (Phase 5) needs just these: the `init` message (`layout` from `Junction.describe()` incl. `crosswalks` and `sidewalk_width`, `vehicle_types`, `vehicle_dims` [length, width], `ped_radius`) and each `frame`: `vehicles` as `[id, x, y, heading, speed, typeIdx]`, `peds` as `[id, x, y, state]` (0 approach, 1 wait, 2 cross, 3 leave), `signals` per arm (G/Y/R), `ped_signal` (walk/flash/dont_walk), `phase`, `stage`. Vehicle x/y is the FRONT bumper.
 
 ## Conventions / decisions
 
 - Left-hand (Indian) traffic; 4-phase split signalling (one approach green at a time); lane counts come from the junction JSON.
+- Safety invariants are tested every step (no overlaps, no red-light entry, no conflicting box paths, no vehicle onto an occupied crosswalk, `emergency_stops == 0`). If a change makes `emergency_stops` non-zero, find the cause; don't relax the test. (Example: the red-light stop obstacle is placed from each vehicle's own `min_gap`, because bikes' small s0 parked them on the line.)
 - `.env` holds `GROQ_API_KEY` (see `.env.example`) for the LLM phase; never commit it. `.claude/`, `data/runs/`, `chroma/` and `rl/models/*.zip` are gitignored.

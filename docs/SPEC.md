@@ -98,5 +98,7 @@ Phase 14 – Unit tests (IDM, signal logic, scenario parser, retrieval), error h
 - [x] Phase 1 – Core sim
 - [x] Phase 2 – Metrics and logging
 - [x] Phase 3 – Web dashboard
-- [x] Phase 4 – Mixed traffic and pedestrians
+- [x] Phase 4 – Mixed traffic and pedestrians (commit f1cf44f; 69 tests). Open item: the dashboard's new
+      visuals (sidewalks, walkers, walk signals, mix sliders) were verified by tests and server checks only,
+      not yet by eye in a browser.
 - [ ] Phase 5 – 2.5D renderer (next)
