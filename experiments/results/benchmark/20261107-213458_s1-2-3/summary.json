@@ -1,0 +1,1968 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-11-07T16:04:58+00:00",
+  "git_commit": "4ab6ad0",
+  "config_hash": "afb8d8975330",
+  "junction": "four_way_2x2",
+  "seeds": [
+    1,
+    2,
+    3
+  ],
+  "settings": {
+    "benchmark": {
+      "seeds": [
+        1,
+        2,
+        3
+      ],
+      "start_vph": 100.0,
+      "step_vph": 50.0,
+      "max_vph": 1500.0,
+      "warmup_s": 300.0,
+      "measure_s": 1200.0,
+      "unserved_frac": 0.05,
+      "unserved_min": 10,
+      "fails_to_stop": 2,
+      "results_dir": "experiments/results/benchmark",
+      "live_start_vph": 100.0,
+      "live_step_vph": 100.0,
+      "live_step_s": 360.0,
+      "live_settle_s": 60.0
+    },
+    "demand_ratios": {
+      "N": 450.0,
+      "E": 350.0,
+      "S": 450.0,
+      "W": 350.0
+    },
+    "vehicle_mix": {
+      "car": 0.35,
+      "bike": 0.45,
+      "auto": 0.15,
+      "bus": 0.05
+    },
+    "turn_probabilities": {
+      "left": 0.25,
+      "straight": 0.55,
+      "right": 0.2
+    },
+    "controller": "fixed",
+    "green_s": 25.0,
+    "aggressiveness": 0.5,
+    "ped_rate_ph": 300.0
+  },
+  "score": {
+    "mean_vph": 2077.0,
+    "std_vph": 115.2,
+    "min_vph": 1944.0,
+    "max_vph": 2145.0,
+    "n": 3,
+    "censored": false,
+    "peak_served_mean_vph": 2322.0
+  },
+  "definition": "Capacity = total junction throughput (veh/h) at the highest demand level where every approach served at least 95% of its arrivals (comparing cycle-averaged queues, with a 10-vehicle noise floor) over a 1200 s window after 300 s of warm-up, with no gridlock.",
+  "ramps": [
+    {
+      "seed": 1,
+      "levels": [
+        {
+          "offered_vph": 399.0,
+          "served_vph": 396.0,
+          "served_ratio": 0.992,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 37,
+              "unserved": 1.3,
+              "allowed": 10,
+              "offered_vph": 111.0,
+              "served_vph": 107.1,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 38,
+              "unserved": -0.4,
+              "allowed": 10,
+              "offered_vph": 114.0,
+              "served_vph": 115.2,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 31,
+              "unserved": 2.1,
+              "allowed": 10,
+              "offered_vph": 93.0,
+              "served_vph": 86.7,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 27,
+              "unserved": -1.3,
+              "allowed": 10,
+              "offered_vph": 81.0,
+              "served_vph": 84.9,
+              "ok": true
+            }
+          },
+          "seed": 1,
+          "volume_vph": 100.0,
+          "mean_delay_s": 50.9,
+          "los": "D",
+          "max_queue": {
+            "N": 5,
+            "E": 6,
+            "S": 4,
+            "W": 6
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 642.0,
+          "served_vph": 621.0,
+          "served_ratio": 0.967,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 45,
+              "unserved": 2.1,
+              "allowed": 10,
+              "offered_vph": 135.0,
+              "served_vph": 128.7,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 70,
+              "unserved": -0.3,
+              "allowed": 10,
+              "offered_vph": 210.0,
+              "served_vph": 210.9,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 56,
+              "unserved": -0.8,
+              "allowed": 10,
+              "offered_vph": 168.0,
+              "served_vph": 170.4,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 43,
+              "unserved": -0.2,
+              "allowed": 10,
+              "offered_vph": 129.0,
+              "served_vph": 129.6,
+              "ok": true
+            }
+          },
+          "seed": 1,
+          "volume_vph": 150.0,
+          "mean_delay_s": 52.9,
+          "los": "D",
+          "max_queue": {
+            "N": 8,
+            "E": 9,
+            "S": 8,
+            "W": 9
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 810.0,
+          "served_vph": 819.0,
+          "served_ratio": 1.011,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 48,
+              "unserved": -1.5,
+              "allowed": 10,
+              "offered_vph": 144.0,
+              "served_vph": 148.5,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 86,
+              "unserved": 0.5,
+              "allowed": 10,
+              "offered_vph": 258.0,
+              "served_vph": 256.5,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 78,
+              "unserved": -1.3,
+              "allowed": 10,
+              "offered_vph": 234.0,
+              "served_vph": 237.9,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 58,
+              "unserved": -0.1,
+              "allowed": 10,
+              "offered_vph": 174.0,
+              "served_vph": 174.3,
+              "ok": true
+            }
+          },
+          "seed": 1,
+          "volume_vph": 200.0,
+          "mean_delay_s": 52.0,
+          "los": "D",
+          "max_queue": {
+            "N": 10,
+            "E": 7,
+            "S": 11,
+            "W": 9
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 1029.0,
+          "served_vph": 1053.0,
+          "served_ratio": 1.023,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 57,
+              "unserved": -2.2,
+              "allowed": 10,
+              "offered_vph": 171.0,
+              "served_vph": 177.6,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 108,
+              "unserved": 0.5,
+              "allowed": 10,
+              "offered_vph": 324.0,
+              "served_vph": 322.5,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 95,
+              "unserved": -3.5,
+              "allowed": 10,
+              "offered_vph": 285.0,
+              "served_vph": 295.5,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 83,
+              "unserved": -0.3,
+              "allowed": 10,
+              "offered_vph": 249.0,
+              "served_vph": 249.9,
+              "ok": true
+            }
+          },
+          "seed": 1,
+          "volume_vph": 250.0,
+          "mean_delay_s": 54.8,
+          "los": "D",
+          "max_queue": {
+            "N": 11,
+            "E": 12,
+            "S": 11,
+            "W": 14
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 1161.0,
+          "served_vph": 1167.0,
+          "served_ratio": 1.005,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 84,
+              "unserved": 2.6,
+              "allowed": 10,
+              "offered_vph": 252.0,
+              "served_vph": 244.2,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 101,
+              "unserved": -1.8,
+              "allowed": 10,
+              "offered_vph": 303.0,
+              "served_vph": 308.4,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 109,
+              "unserved": -5.2,
+              "allowed": 10,
+              "offered_vph": 327.0,
+              "served_vph": 342.6,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 93,
+              "unserved": 0.0,
+              "allowed": 10,
+              "offered_vph": 279.0,
+              "served_vph": 279.0,
+              "ok": true
+            }
+          },
+          "seed": 1,
+          "volume_vph": 300.0,
+          "mean_delay_s": 53.2,
+          "los": "D",
+          "max_queue": {
+            "N": 10,
+            "E": 10,
+            "S": 13,
+            "W": 14
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 1434.0,
+          "served_vph": 1437.0,
+          "served_ratio": 1.002,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 111,
+              "unserved": -0.5,
+              "allowed": 10,
+              "offered_vph": 333.0,
+              "served_vph": 334.5,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 126,
+              "unserved": -0.4,
+              "allowed": 10,
+              "offered_vph": 378.0,
+              "served_vph": 379.2,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 135,
+              "unserved": -3.1,
+              "allowed": 10,
+              "offered_vph": 405.0,
+              "served_vph": 414.3,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 106,
+              "unserved": -0.0,
+              "allowed": 10,
+              "offered_vph": 318.0,
+              "served_vph": 318.0,
+              "ok": true
+            }
+          },
+          "seed": 1,
+          "volume_vph": 350.0,
+          "mean_delay_s": 53.7,
+          "los": "D",
+          "max_queue": {
+            "N": 17,
+            "E": 16,
+            "S": 14,
+            "W": 13
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 1545.0,
+          "served_vph": 1548.0,
+          "served_ratio": 1.002,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 104,
+              "unserved": -1.2,
+              "allowed": 10,
+              "offered_vph": 312.0,
+              "served_vph": 315.6,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 149,
+              "unserved": -3.9,
+              "allowed": 10,
+              "offered_vph": 447.0,
+              "served_vph": 458.7,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 143,
+              "unserved": 2.8,
+              "allowed": 10,
+              "offered_vph": 429.0,
+              "served_vph": 420.6,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 119,
+              "unserved": -2.2,
+              "allowed": 10,
+              "offered_vph": 357.0,
+              "served_vph": 363.6,
+              "ok": true
+            }
+          },
+          "seed": 1,
+          "volume_vph": 400.0,
+          "mean_delay_s": 61.6,
+          "los": "E",
+          "max_queue": {
+            "N": 25,
+            "E": 11,
+            "S": 17,
+            "W": 14
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 1728.0,
+          "served_vph": 1734.0,
+          "served_ratio": 1.003,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 130,
+              "unserved": 1.5,
+              "allowed": 10,
+              "offered_vph": 390.0,
+              "served_vph": 385.5,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 149,
+              "unserved": -7.5,
+              "allowed": 10,
+              "offered_vph": 447.0,
+              "served_vph": 469.5,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 161,
+              "unserved": 1.5,
+              "allowed": 10,
+              "offered_vph": 483.0,
+              "served_vph": 478.5,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 136,
+              "unserved": -2.2,
+              "allowed": 10,
+              "offered_vph": 408.0,
+              "served_vph": 414.6,
+              "ok": true
+            }
+          },
+          "seed": 1,
+          "volume_vph": 450.0,
+          "mean_delay_s": 65.1,
+          "los": "E",
+          "max_queue": {
+            "N": 22,
+            "E": 15,
+            "S": 24,
+            "W": 18
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 1914.0,
+          "served_vph": 1935.0,
+          "served_ratio": 1.011,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 129,
+              "unserved": -5.8,
+              "allowed": 10,
+              "offered_vph": 387.0,
+              "served_vph": 404.4,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 158,
+              "unserved": -9.5,
+              "allowed": 10,
+              "offered_vph": 474.0,
+              "served_vph": 502.5,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 182,
+              "unserved": -0.0,
+              "allowed": 10,
+              "offered_vph": 546.0,
+              "served_vph": 546.0,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 169,
+              "unserved": -4.1,
+              "allowed": 10,
+              "offered_vph": 507.0,
+              "served_vph": 519.3,
+              "ok": true
+            }
+          },
+          "seed": 1,
+          "volume_vph": 500.0,
+          "mean_delay_s": 74.3,
+          "los": "E",
+          "max_queue": {
+            "N": 23,
+            "E": 22,
+            "S": 30,
+            "W": 21
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 2184.0,
+          "served_vph": 2145.0,
+          "served_ratio": 0.982,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 152,
+              "unserved": 1.8,
+              "allowed": 10,
+              "offered_vph": 456.0,
+              "served_vph": 450.6,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 201,
+              "unserved": 3.6,
+              "allowed": 10.1,
+              "offered_vph": 603.0,
+              "served_vph": 592.2,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 188,
+              "unserved": 2.7,
+              "allowed": 10,
+              "offered_vph": 564.0,
+              "served_vph": 555.9,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 187,
+              "unserved": -3.6,
+              "allowed": 10,
+              "offered_vph": 561.0,
+              "served_vph": 571.8,
+              "ok": true
+            }
+          },
+          "seed": 1,
+          "volume_vph": 550.0,
+          "mean_delay_s": 93.3,
+          "los": "F",
+          "max_queue": {
+            "N": 39,
+            "E": 22,
+            "S": 31,
+            "W": 32
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 2355.0,
+          "served_vph": 2244.0,
+          "served_ratio": 0.953,
+          "gridlock": false,
+          "failing_approaches": [
+            "N",
+            "S"
+          ],
+          "passed": false,
+          "approaches": {
+            "E": {
+              "arrivals": 160,
+              "unserved": -2.4,
+              "allowed": 10,
+              "offered_vph": 480.0,
+              "served_vph": 487.2,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 200,
+              "unserved": 11.4,
+              "allowed": 10.0,
+              "offered_vph": 600.0,
+              "served_vph": 565.8,
+              "ok": false
+            },
+            "S": {
+              "arrivals": 213,
+              "unserved": 19.1,
+              "allowed": 10.7,
+              "offered_vph": 639.0,
+              "served_vph": 581.7,
+              "ok": false
+            },
+            "W": {
+              "arrivals": 212,
+              "unserved": 6.5,
+              "allowed": 10.6,
+              "offered_vph": 636.0,
+              "served_vph": 616.5,
+              "ok": true
+            }
+          },
+          "seed": 1,
+          "volume_vph": 600.0,
+          "mean_delay_s": 120.5,
+          "los": "F",
+          "max_queue": {
+            "N": 40,
+            "E": 23,
+            "S": 51,
+            "W": 38
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 2565.0,
+          "served_vph": 2349.0,
+          "served_ratio": 0.916,
+          "gridlock": false,
+          "failing_approaches": [
+            "N",
+            "S"
+          ],
+          "passed": false,
+          "approaches": {
+            "E": {
+              "arrivals": 186,
+              "unserved": 8.6,
+              "allowed": 10,
+              "offered_vph": 558.0,
+              "served_vph": 532.2,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 225,
+              "unserved": 11.8,
+              "allowed": 11.2,
+              "offered_vph": 675.0,
+              "served_vph": 639.6,
+              "ok": false
+            },
+            "S": {
+              "arrivals": 244,
+              "unserved": 47.7,
+              "allowed": 12.2,
+              "offered_vph": 732.0,
+              "served_vph": 588.9,
+              "ok": false
+            },
+            "W": {
+              "arrivals": 200,
+              "unserved": 3.7,
+              "allowed": 10.0,
+              "offered_vph": 600.0,
+              "served_vph": 588.9,
+              "ok": true
+            }
+          },
+          "seed": 1,
+          "volume_vph": 650.0,
+          "mean_delay_s": 144.8,
+          "los": "F",
+          "max_queue": {
+            "N": 40,
+            "E": 26,
+            "S": 56,
+            "W": 42
+          },
+          "emergency_stops": 0
+        }
+      ],
+      "capacity_vph": 2145.0,
+      "capacity_level_vph": 550.0,
+      "breakdown_level_vph": 600.0,
+      "censored": false,
+      "peak_served_vph": 2349.0
+    },
+    {
+      "seed": 2,
+      "levels": [
+        {
+          "offered_vph": 360.0,
+          "served_vph": 351.0,
+          "served_ratio": 0.975,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 26,
+              "unserved": -0.6,
+              "allowed": 10,
+              "offered_vph": 78.0,
+              "served_vph": 79.8,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 44,
+              "unserved": 0.8,
+              "allowed": 10,
+              "offered_vph": 132.0,
+              "served_vph": 129.6,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 25,
+              "unserved": -1.7,
+              "allowed": 10,
+              "offered_vph": 75.0,
+              "served_vph": 80.1,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 25,
+              "unserved": -0.1,
+              "allowed": 10,
+              "offered_vph": 75.0,
+              "served_vph": 75.3,
+              "ok": true
+            }
+          },
+          "seed": 2,
+          "volume_vph": 100.0,
+          "mean_delay_s": 43.9,
+          "los": "D",
+          "max_queue": {
+            "N": 8,
+            "E": 4,
+            "S": 4,
+            "W": 3
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 561.0,
+          "served_vph": 555.0,
+          "served_ratio": 0.989,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 48,
+              "unserved": -1.8,
+              "allowed": 10,
+              "offered_vph": 144.0,
+              "served_vph": 149.4,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 52,
+              "unserved": -2.3,
+              "allowed": 10,
+              "offered_vph": 156.0,
+              "served_vph": 162.9,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 55,
+              "unserved": 2.8,
+              "allowed": 10,
+              "offered_vph": 165.0,
+              "served_vph": 156.6,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 32,
+              "unserved": -1.9,
+              "allowed": 10,
+              "offered_vph": 96.0,
+              "served_vph": 101.7,
+              "ok": true
+            }
+          },
+          "seed": 2,
+          "volume_vph": 150.0,
+          "mean_delay_s": 55.0,
+          "los": "D",
+          "max_queue": {
+            "N": 9,
+            "E": 10,
+            "S": 9,
+            "W": 5
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 786.0,
+          "served_vph": 768.0,
+          "served_ratio": 0.977,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 61,
+              "unserved": 0.0,
+              "allowed": 10,
+              "offered_vph": 183.0,
+              "served_vph": 183.0,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 74,
+              "unserved": 0.4,
+              "allowed": 10,
+              "offered_vph": 222.0,
+              "served_vph": 220.8,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 74,
+              "unserved": -3.5,
+              "allowed": 10,
+              "offered_vph": 222.0,
+              "served_vph": 232.5,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 53,
+              "unserved": 3.0,
+              "allowed": 10,
+              "offered_vph": 159.0,
+              "served_vph": 150.0,
+              "ok": true
+            }
+          },
+          "seed": 2,
+          "volume_vph": 200.0,
+          "mean_delay_s": 49.2,
+          "los": "D",
+          "max_queue": {
+            "N": 8,
+            "E": 8,
+            "S": 11,
+            "W": 8
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 993.0,
+          "served_vph": 987.0,
+          "served_ratio": 0.994,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 74,
+              "unserved": -2.0,
+              "allowed": 10,
+              "offered_vph": 222.0,
+              "served_vph": 228.0,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 99,
+              "unserved": -0.7,
+              "allowed": 10,
+              "offered_vph": 297.0,
+              "served_vph": 299.1,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 82,
+              "unserved": -5.1,
+              "allowed": 10,
+              "offered_vph": 246.0,
+              "served_vph": 261.3,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 76,
+              "unserved": 2.2,
+              "allowed": 10,
+              "offered_vph": 228.0,
+              "served_vph": 221.4,
+              "ok": true
+            }
+          },
+          "seed": 2,
+          "volume_vph": 250.0,
+          "mean_delay_s": 52.6,
+          "los": "D",
+          "max_queue": {
+            "N": 14,
+            "E": 12,
+            "S": 14,
+            "W": 10
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 1119.0,
+          "served_vph": 1104.0,
+          "served_ratio": 0.987,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 76,
+              "unserved": 1.1,
+              "allowed": 10,
+              "offered_vph": 228.0,
+              "served_vph": 224.7,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 108,
+              "unserved": -1.2,
+              "allowed": 10,
+              "offered_vph": 324.0,
+              "served_vph": 327.6,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 101,
+              "unserved": 1.3,
+              "allowed": 10,
+              "offered_vph": 303.0,
+              "served_vph": 299.1,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 88,
+              "unserved": 0.2,
+              "allowed": 10,
+              "offered_vph": 264.0,
+              "served_vph": 263.4,
+              "ok": true
+            }
+          },
+          "seed": 2,
+          "volume_vph": 300.0,
+          "mean_delay_s": 51.5,
+          "los": "D",
+          "max_queue": {
+            "N": 12,
+            "E": 11,
+            "S": 11,
+            "W": 11
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 1377.0,
+          "served_vph": 1338.0,
+          "served_ratio": 0.972,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 123,
+              "unserved": 9.2,
+              "allowed": 10,
+              "offered_vph": 369.0,
+              "served_vph": 341.4,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 118,
+              "unserved": -3.7,
+              "allowed": 10,
+              "offered_vph": 354.0,
+              "served_vph": 365.1,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 115,
+              "unserved": -0.3,
+              "allowed": 10,
+              "offered_vph": 345.0,
+              "served_vph": 345.9,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 103,
+              "unserved": 4.8,
+              "allowed": 10,
+              "offered_vph": 309.0,
+              "served_vph": 294.6,
+              "ok": true
+            }
+          },
+          "seed": 2,
+          "volume_vph": 350.0,
+          "mean_delay_s": 56.2,
+          "los": "E",
+          "max_queue": {
+            "N": 17,
+            "E": 22,
+            "S": 15,
+            "W": 13
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 1623.0,
+          "served_vph": 1581.0,
+          "served_ratio": 0.974,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 133,
+              "unserved": 4.8,
+              "allowed": 10,
+              "offered_vph": 399.0,
+              "served_vph": 384.6,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 138,
+              "unserved": -4.9,
+              "allowed": 10,
+              "offered_vph": 414.0,
+              "served_vph": 428.7,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 157,
+              "unserved": 1.8,
+              "allowed": 10,
+              "offered_vph": 471.0,
+              "served_vph": 465.6,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 113,
+              "unserved": 4.2,
+              "allowed": 10,
+              "offered_vph": 339.0,
+              "served_vph": 326.4,
+              "ok": true
+            }
+          },
+          "seed": 2,
+          "volume_vph": 400.0,
+          "mean_delay_s": 65.9,
+          "los": "E",
+          "max_queue": {
+            "N": 18,
+            "E": 20,
+            "S": 24,
+            "W": 15
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 1863.0,
+          "served_vph": 1848.0,
+          "served_ratio": 0.992,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 168,
+              "unserved": -2.9,
+              "allowed": 10,
+              "offered_vph": 504.0,
+              "served_vph": 512.7,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 148,
+              "unserved": -12.6,
+              "allowed": 10,
+              "offered_vph": 444.0,
+              "served_vph": 481.8,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 164,
+              "unserved": 1.3,
+              "allowed": 10,
+              "offered_vph": 492.0,
+              "served_vph": 488.1,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 141,
+              "unserved": 7.0,
+              "allowed": 10,
+              "offered_vph": 423.0,
+              "served_vph": 402.0,
+              "ok": true
+            }
+          },
+          "seed": 2,
+          "volume_vph": 450.0,
+          "mean_delay_s": 69.4,
+          "los": "E",
+          "max_queue": {
+            "N": 25,
+            "E": 33,
+            "S": 20,
+            "W": 20
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 2034.0,
+          "served_vph": 1995.0,
+          "served_ratio": 0.981,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 185,
+              "unserved": 8.5,
+              "allowed": 10,
+              "offered_vph": 555.0,
+              "served_vph": 529.5,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 173,
+              "unserved": -6.2,
+              "allowed": 10,
+              "offered_vph": 519.0,
+              "served_vph": 537.6,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 181,
+              "unserved": 1.5,
+              "allowed": 10,
+              "offered_vph": 543.0,
+              "served_vph": 538.5,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 139,
+              "unserved": 4.6,
+              "allowed": 10,
+              "offered_vph": 417.0,
+              "served_vph": 403.2,
+              "ok": true
+            }
+          },
+          "seed": 2,
+          "volume_vph": 500.0,
+          "mean_delay_s": 79.3,
+          "los": "E",
+          "max_queue": {
+            "N": 29,
+            "E": 27,
+            "S": 24,
+            "W": 20
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 2184.0,
+          "served_vph": 2142.0,
+          "served_ratio": 0.981,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 193,
+              "unserved": 4.4,
+              "allowed": 10,
+              "offered_vph": 579.0,
+              "served_vph": 565.8,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 185,
+              "unserved": 4.3,
+              "allowed": 10,
+              "offered_vph": 555.0,
+              "served_vph": 542.1,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 181,
+              "unserved": -2.7,
+              "allowed": 10,
+              "offered_vph": 543.0,
+              "served_vph": 551.1,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 169,
+              "unserved": 8.7,
+              "allowed": 10,
+              "offered_vph": 507.0,
+              "served_vph": 480.9,
+              "ok": true
+            }
+          },
+          "seed": 2,
+          "volume_vph": 550.0,
+          "mean_delay_s": 71.1,
+          "los": "E",
+          "max_queue": {
+            "N": 30,
+            "E": 28,
+            "S": 21,
+            "W": 22
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 2364.0,
+          "served_vph": 2214.0,
+          "served_ratio": 0.937,
+          "gridlock": false,
+          "failing_approaches": [
+            "N"
+          ],
+          "passed": false,
+          "approaches": {
+            "E": {
+              "arrivals": 191,
+              "unserved": 3.9,
+              "allowed": 10,
+              "offered_vph": 573.0,
+              "served_vph": 561.3,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 212,
+              "unserved": 25.4,
+              "allowed": 10.6,
+              "offered_vph": 636.0,
+              "served_vph": 559.8,
+              "ok": false
+            },
+            "S": {
+              "arrivals": 210,
+              "unserved": 2.5,
+              "allowed": 10.5,
+              "offered_vph": 630.0,
+              "served_vph": 622.5,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 175,
+              "unserved": 6.0,
+              "allowed": 10,
+              "offered_vph": 525.0,
+              "served_vph": 507.0,
+              "ok": true
+            }
+          },
+          "seed": 2,
+          "volume_vph": 600.0,
+          "mean_delay_s": 88.4,
+          "los": "F",
+          "max_queue": {
+            "N": 38,
+            "E": 29,
+            "S": 28,
+            "W": 28
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 2469.0,
+          "served_vph": 2358.0,
+          "served_ratio": 0.955,
+          "gridlock": false,
+          "failing_approaches": [
+            "N",
+            "W"
+          ],
+          "passed": false,
+          "approaches": {
+            "E": {
+              "arrivals": 197,
+              "unserved": -5.4,
+              "allowed": 10,
+              "offered_vph": 591.0,
+              "served_vph": 607.2,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 207,
+              "unserved": 18.3,
+              "allowed": 10.4,
+              "offered_vph": 621.0,
+              "served_vph": 566.1,
+              "ok": false
+            },
+            "S": {
+              "arrivals": 222,
+              "unserved": 2.2,
+              "allowed": 11.1,
+              "offered_vph": 666.0,
+              "served_vph": 659.4,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 197,
+              "unserved": 17.8,
+              "allowed": 10,
+              "offered_vph": 591.0,
+              "served_vph": 537.6,
+              "ok": false
+            }
+          },
+          "seed": 2,
+          "volume_vph": 650.0,
+          "mean_delay_s": 114.6,
+          "los": "F",
+          "max_queue": {
+            "N": 46,
+            "E": 30,
+            "S": 45,
+            "W": 35
+          },
+          "emergency_stops": 0
+        }
+      ],
+      "capacity_vph": 2142.0,
+      "capacity_level_vph": 550.0,
+      "breakdown_level_vph": 600.0,
+      "censored": false,
+      "peak_served_vph": 2358.0
+    },
+    {
+      "seed": 3,
+      "levels": [
+        {
+          "offered_vph": 366.0,
+          "served_vph": 378.0,
+          "served_ratio": 1.033,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 28,
+              "unserved": -1.0,
+              "allowed": 10,
+              "offered_vph": 84.0,
+              "served_vph": 87.0,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 36,
+              "unserved": 1.6,
+              "allowed": 10,
+              "offered_vph": 108.0,
+              "served_vph": 103.2,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 35,
+              "unserved": -1.3,
+              "allowed": 10,
+              "offered_vph": 105.0,
+              "served_vph": 108.9,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 23,
+              "unserved": -2.3,
+              "allowed": 10,
+              "offered_vph": 69.0,
+              "served_vph": 75.9,
+              "ok": true
+            }
+          },
+          "seed": 3,
+          "volume_vph": 100.0,
+          "mean_delay_s": 49.9,
+          "los": "D",
+          "max_queue": {
+            "N": 5,
+            "E": 5,
+            "S": 8,
+            "W": 4
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 591.0,
+          "served_vph": 600.0,
+          "served_ratio": 1.015,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 55,
+              "unserved": 2.8,
+              "allowed": 10,
+              "offered_vph": 165.0,
+              "served_vph": 156.6,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 50,
+              "unserved": -2.3,
+              "allowed": 10,
+              "offered_vph": 150.0,
+              "served_vph": 156.9,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 45,
+              "unserved": 0.2,
+              "allowed": 10,
+              "offered_vph": 135.0,
+              "served_vph": 134.4,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 47,
+              "unserved": -3.9,
+              "allowed": 10,
+              "offered_vph": 141.0,
+              "served_vph": 152.7,
+              "ok": true
+            }
+          },
+          "seed": 3,
+          "volume_vph": 150.0,
+          "mean_delay_s": 51.9,
+          "los": "D",
+          "max_queue": {
+            "N": 8,
+            "E": 10,
+            "S": 7,
+            "W": 8
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 765.0,
+          "served_vph": 756.0,
+          "served_ratio": 0.988,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 59,
+              "unserved": 5.1,
+              "allowed": 10,
+              "offered_vph": 177.0,
+              "served_vph": 161.7,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 69,
+              "unserved": 2.3,
+              "allowed": 10,
+              "offered_vph": 207.0,
+              "served_vph": 200.1,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 70,
+              "unserved": -4.1,
+              "allowed": 10,
+              "offered_vph": 210.0,
+              "served_vph": 222.3,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 57,
+              "unserved": -2.3,
+              "allowed": 10,
+              "offered_vph": 171.0,
+              "served_vph": 177.9,
+              "ok": true
+            }
+          },
+          "seed": 3,
+          "volume_vph": 200.0,
+          "mean_delay_s": 48.9,
+          "los": "D",
+          "max_queue": {
+            "N": 8,
+            "E": 8,
+            "S": 10,
+            "W": 7
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 930.0,
+          "served_vph": 930.0,
+          "served_ratio": 1.0,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 73,
+              "unserved": 3.4,
+              "allowed": 10,
+              "offered_vph": 219.0,
+              "served_vph": 208.8,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 94,
+              "unserved": 2.0,
+              "allowed": 10,
+              "offered_vph": 282.0,
+              "served_vph": 276.0,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 81,
+              "unserved": -2.5,
+              "allowed": 10,
+              "offered_vph": 243.0,
+              "served_vph": 250.5,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 62,
+              "unserved": -1.0,
+              "allowed": 10,
+              "offered_vph": 186.0,
+              "served_vph": 189.0,
+              "ok": true
+            }
+          },
+          "seed": 3,
+          "volume_vph": 250.0,
+          "mean_delay_s": 51.7,
+          "los": "D",
+          "max_queue": {
+            "N": 11,
+            "E": 9,
+            "S": 11,
+            "W": 8
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 1206.0,
+          "served_vph": 1188.0,
+          "served_ratio": 0.985,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 85,
+              "unserved": -3.8,
+              "allowed": 10,
+              "offered_vph": 255.0,
+              "served_vph": 266.4,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 126,
+              "unserved": -1.2,
+              "allowed": 10,
+              "offered_vph": 378.0,
+              "served_vph": 381.6,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 102,
+              "unserved": 1.6,
+              "allowed": 10,
+              "offered_vph": 306.0,
+              "served_vph": 301.2,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 89,
+              "unserved": -2.8,
+              "allowed": 10,
+              "offered_vph": 267.0,
+              "served_vph": 275.4,
+              "ok": true
+            }
+          },
+          "seed": 3,
+          "volume_vph": 300.0,
+          "mean_delay_s": 52.5,
+          "los": "D",
+          "max_queue": {
+            "N": 14,
+            "E": 12,
+            "S": 13,
+            "W": 10
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 1377.0,
+          "served_vph": 1380.0,
+          "served_ratio": 1.002,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 105,
+              "unserved": -3.6,
+              "allowed": 10,
+              "offered_vph": 315.0,
+              "served_vph": 325.8,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 155,
+              "unserved": -1.4,
+              "allowed": 10,
+              "offered_vph": 465.0,
+              "served_vph": 469.2,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 109,
+              "unserved": 0.1,
+              "allowed": 10,
+              "offered_vph": 327.0,
+              "served_vph": 326.7,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 90,
+              "unserved": -2.6,
+              "allowed": 10,
+              "offered_vph": 270.0,
+              "served_vph": 277.8,
+              "ok": true
+            }
+          },
+          "seed": 3,
+          "volume_vph": 350.0,
+          "mean_delay_s": 55.8,
+          "los": "E",
+          "max_queue": {
+            "N": 18,
+            "E": 15,
+            "S": 13,
+            "W": 11
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 1617.0,
+          "served_vph": 1620.0,
+          "served_ratio": 1.002,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 108,
+              "unserved": -6.3,
+              "allowed": 10,
+              "offered_vph": 324.0,
+              "served_vph": 342.9,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 182,
+              "unserved": -3.0,
+              "allowed": 10,
+              "offered_vph": 546.0,
+              "served_vph": 555.0,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 147,
+              "unserved": 1.8,
+              "allowed": 10,
+              "offered_vph": 441.0,
+              "served_vph": 435.6,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 102,
+              "unserved": 0.9,
+              "allowed": 10,
+              "offered_vph": 306.0,
+              "served_vph": 303.3,
+              "ok": true
+            }
+          },
+          "seed": 3,
+          "volume_vph": 400.0,
+          "mean_delay_s": 60.6,
+          "los": "E",
+          "max_queue": {
+            "N": 25,
+            "E": 17,
+            "S": 23,
+            "W": 14
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 1734.0,
+          "served_vph": 1770.0,
+          "served_ratio": 1.021,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 119,
+              "unserved": -4.5,
+              "allowed": 10,
+              "offered_vph": 357.0,
+              "served_vph": 370.5,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 175,
+              "unserved": 3.7,
+              "allowed": 10,
+              "offered_vph": 525.0,
+              "served_vph": 513.9,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 162,
+              "unserved": -8.6,
+              "allowed": 10,
+              "offered_vph": 486.0,
+              "served_vph": 511.8,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 122,
+              "unserved": -1.8,
+              "allowed": 10,
+              "offered_vph": 366.0,
+              "served_vph": 371.4,
+              "ok": true
+            }
+          },
+          "seed": 3,
+          "volume_vph": 450.0,
+          "mean_delay_s": 65.6,
+          "los": "E",
+          "max_queue": {
+            "N": 26,
+            "E": 19,
+            "S": 22,
+            "W": 16
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 1929.0,
+          "served_vph": 1944.0,
+          "served_ratio": 1.008,
+          "gridlock": false,
+          "failing_approaches": [],
+          "passed": true,
+          "approaches": {
+            "E": {
+              "arrivals": 135,
+              "unserved": -0.5,
+              "allowed": 10,
+              "offered_vph": 405.0,
+              "served_vph": 406.5,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 186,
+              "unserved": 6.0,
+              "allowed": 10,
+              "offered_vph": 558.0,
+              "served_vph": 540.0,
+              "ok": true
+            },
+            "S": {
+              "arrivals": 163,
+              "unserved": -12.4,
+              "allowed": 10,
+              "offered_vph": 489.0,
+              "served_vph": 526.2,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 159,
+              "unserved": 5.6,
+              "allowed": 10,
+              "offered_vph": 477.0,
+              "served_vph": 460.2,
+              "ok": true
+            }
+          },
+          "seed": 3,
+          "volume_vph": 500.0,
+          "mean_delay_s": 65.3,
+          "los": "E",
+          "max_queue": {
+            "N": 24,
+            "E": 18,
+            "S": 27,
+            "W": 21
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 2184.0,
+          "served_vph": 2130.0,
+          "served_ratio": 0.975,
+          "gridlock": false,
+          "failing_approaches": [
+            "N"
+          ],
+          "passed": false,
+          "approaches": {
+            "E": {
+              "arrivals": 154,
+              "unserved": 7.2,
+              "allowed": 10,
+              "offered_vph": 462.0,
+              "served_vph": 440.4,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 220,
+              "unserved": 23.4,
+              "allowed": 11.0,
+              "offered_vph": 660.0,
+              "served_vph": 589.8,
+              "ok": false
+            },
+            "S": {
+              "arrivals": 184,
+              "unserved": -5.1,
+              "allowed": 10,
+              "offered_vph": 552.0,
+              "served_vph": 567.3,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 170,
+              "unserved": -4.3,
+              "allowed": 10,
+              "offered_vph": 510.0,
+              "served_vph": 522.9,
+              "ok": true
+            }
+          },
+          "seed": 3,
+          "volume_vph": 550.0,
+          "mean_delay_s": 92.1,
+          "los": "F",
+          "max_queue": {
+            "N": 45,
+            "E": 27,
+            "S": 30,
+            "W": 20
+          },
+          "emergency_stops": 0
+        },
+        {
+          "offered_vph": 2370.0,
+          "served_vph": 2259.0,
+          "served_ratio": 0.953,
+          "gridlock": false,
+          "failing_approaches": [
+            "N"
+          ],
+          "passed": false,
+          "approaches": {
+            "E": {
+              "arrivals": 163,
+              "unserved": 1.8,
+              "allowed": 10,
+              "offered_vph": 489.0,
+              "served_vph": 483.6,
+              "ok": true
+            },
+            "N": {
+              "arrivals": 252,
+              "unserved": 32.1,
+              "allowed": 12.6,
+              "offered_vph": 756.0,
+              "served_vph": 659.7,
+              "ok": false
+            },
+            "S": {
+              "arrivals": 188,
+              "unserved": -3.6,
+              "allowed": 10,
+              "offered_vph": 564.0,
+              "served_vph": 574.8,
+              "ok": true
+            },
+            "W": {
+              "arrivals": 187,
+              "unserved": -0.5,
+              "allowed": 10,
+              "offered_vph": 561.0,
+              "served_vph": 562.5,
+              "ok": true
+            }
+          },
+          "seed": 3,
+          "volume_vph": 600.0,
+          "mean_delay_s": 108.5,
+          "los": "F",
+          "max_queue": {
+            "N": 59,
+            "E": 29,
+            "S": 25,
+            "W": 27
+          },
+          "emergency_stops": 0
+        }
+      ],
+      "capacity_vph": 1944.0,
+      "capacity_level_vph": 500.0,
+      "breakdown_level_vph": 550.0,
+      "censored": false,
+      "peak_served_vph": 2259.0
+    }
+  ],
+  "wall_time_s": 68.7
+}
