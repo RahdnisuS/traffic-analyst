@@ -32,7 +32,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 from .config import Movement
-from .geometry import Path, line_intersection, min_distance, quadratic_bezier
+from .geometry import Path, line_intersection, min_distance, quadratic_bezier, segment_distances
 
 ARM_VECTORS: dict[str, np.ndarray] = {
     "N": np.array([0.0, 1.0]),
@@ -153,6 +153,9 @@ def _arm_for_direction(v: np.ndarray) -> str:
     raise ValueError(f"no arm points along {v}")
 
 
+_BODY_CONFLICT_CACHE: dict = {}
+
+
 class Junction:
     """Immutable road geometry plus derived lookup tables used by the engine."""
 
@@ -183,6 +186,8 @@ class Junction:
         self._build_lanes()
         self._build_connectors(turn_lateral_accel)
         self.conflicts = self._compute_conflicts(conflict_distance, filter_conflict_distance)
+        # Filled by compute_body_conflicts() once vehicle sizes are known (the engine does it).
+        self.body_conflicts: dict[tuple[str, str], dict[str, frozenset[str]]] = {}
         # feeders[outbound_id] = connectors that empty into that exit lane
         self.feeders: dict[str, list[str]] = {eid: [] for eid in self.edges
                                               if self.edges[eid].kind == "outbound"}
@@ -336,6 +341,82 @@ class Junction:
                 out[a.id].add(b.id)
                 out[b.id].add(a.id)
         return {k: frozenset(v) for k, v in out.items()}
+
+    # ------------------------------------------------------------------ body-swept conflicts
+    def _swept_body(self, cx: Edge, length: float, step: float = 1.0) -> tuple[np.ndarray, np.ndarray]:
+        """Where a vehicle's BODY is while it uses connector ``cx``: rear and front points of the
+        segment rear->front, sampled from "front bumper reaches the stop line" until "rear leaves
+        the box". The rear follows the same path as the front (no trailer maths), so on a turn the
+        body is the CHORD of the curve and cuts inside it, like a real long vehicle."""
+        src, dst = self.edges[cx.source_id], self.edges[cx.target_id]
+        chain = [(src, 0.0), (cx, src.length), (dst, src.length + cx.length)]
+
+        def points(s_route: np.ndarray) -> np.ndarray:
+            out = np.empty((len(s_route), 2))
+            for edge, start in chain:  # later edges overwrite shared boundary points: harmless
+                m = (s_route >= start - 1e-9) & (s_route <= start + edge.length + 1e-9)
+                if m.any():
+                    x, y, _ = edge.path.poses_at(s_route[m] - start)
+                    out[m, 0], out[m, 1] = x, y
+            return out
+
+        front = np.arange(src.length, src.length + cx.length + length + 1e-9, step)
+        return points(np.maximum(front - length, 0.0)), points(front)
+
+    def compute_body_conflicts(self, bodies: dict[str, tuple[float, float]], clearance: float,
+                               filtering_types: set[str] | frozenset[str] = frozenset()) -> None:
+        """Conflicts that depend on WHO is driving: ``body_conflicts[(ta, tb)][cx_a]`` = connectors
+        that a vehicle of type ``tb`` must not be using while one of type ``ta`` uses ``cx_a``.
+
+        WHY: the centreline test above (``conflicts``) treats every vehicle as a point on its path.
+        A 12 m bus turning right sweeps its body across the neighbouring lane's path, which a
+        4.5 m car does not; so whether two paths can be used together depends on the vehicles.
+        Two paths conflict for (ta, tb) when, at any moment of either crossing, the bodies would
+        come closer than ``clearance`` (half-widths included).
+
+        Pairs from the SAME source lane are left out: those vehicles are kept apart by
+        car-following (the engine's follower keeps tracking a leader that has turned off).
+        Filter-lane paths only ever carry ``filtering_types`` (bikes), so only those are computed.
+        The result is cached per layout + vehicle sizes: every Simulation builds a Junction, and
+        the benchmark builds hundreds.
+        """
+        key = (self.spec.model_dump_json(), tuple(sorted(bodies.items())), clearance, tuple(sorted(filtering_types)))
+        cached = _BODY_CONFLICT_CACHE.get(key)
+        if cached is None:
+            cached = self._body_conflicts(bodies, clearance, frozenset(filtering_types))
+            _BODY_CONFLICT_CACHE[key] = cached
+        self.body_conflicts = cached
+
+    def _body_conflicts(self, bodies, clearance, filtering_types) -> dict:
+        cxs = list(self.connectors())
+        types = sorted(bodies)
+        allowed = {c.id: (filtering_types if self.edges[c.source_id].kind == "filter" else set(types)) for c in cxs}
+        swept = {(c.id, t): self._swept_body(c, bodies[t][0]) for c in cxs for t in types if t in allowed[c.id]}
+        boxes = {k: (np.minimum(r.min(0), f.min(0)), np.maximum(r.max(0), f.max(0))) for k, (r, f) in swept.items()}
+        out = {(ta, tb): {c.id: set() for c in cxs} for ta in types for tb in types}
+        for i, a in enumerate(cxs):
+            for b in cxs[i + 1:]:
+                if a.source_id == b.source_id:
+                    continue
+                for ta in sorted(allowed[a.id]):
+                    for tb in sorted(allowed[b.id]):
+                        need = (bodies[ta][1] + bodies[tb][1]) / 2 + clearance
+                        (lo_a, hi_a), (lo_b, hi_b) = boxes[(a.id, ta)], boxes[(b.id, tb)]
+                        if np.any(lo_a - need > hi_b) or np.any(lo_b - need > hi_a):
+                            continue  # bounding boxes too far apart: cannot touch
+                        (ra, fa), (rb, fb) = swept[(a.id, ta)], swept[(b.id, tb)]
+                        if segment_distances(ra, fa, rb, fb).min() < need:
+                            out[(ta, tb)][a.id].add(b.id)
+                            out[(tb, ta)][b.id].add(a.id)
+        return {k: {c: frozenset(v) for c, v in m.items()} for k, m in out.items()}
+
+    def conflicts_for(self, cx: str, vtype: str, other_cx: str, other_type: str) -> bool:
+        """May a ``vtype`` vehicle NOT use ``cx`` while an ``other_type`` vehicle uses ``other_cx``?
+        The centreline conflicts always apply; body conflicts add to them for big vehicles."""
+        if other_cx in self.conflicts[cx]:
+            return True
+        bc = self.body_conflicts.get((vtype, other_type))
+        return bc is not None and other_cx in bc.get(cx, ())
 
     def _build_phases(self) -> list[Phase]:
         phases = []

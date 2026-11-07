@@ -113,6 +113,10 @@ class Simulation:
         self._params_cache: dict[str, VehicleTypeParams] = {}
         self._refresh_params()
         J = self.junction
+        if not J.body_conflicts:
+            J.compute_body_conflicts({t: (q.length, q.width) for t, q in config.vehicle_types.items()},
+                                     ix.body_clearance_m,
+                                     {t for t, q in config.vehicle_types.items() if q.filters})
         self._cx_exit_arm = {c.id: J.edges[c.target_id].arm for c in J.connectors()}
         self.filter_moves = 0  # how many times a bike moved into a filter lane
         # filter lane -> the inbound lanes on either side of it
@@ -121,6 +125,15 @@ class Simulation:
             for f in flts:
                 self._filter_sides.setdefault(f, []).append(lane_id)
         self._queue_tail: dict[str, float] = {}
+        # Sideways distance between a filter lane's centreline and each lane beside it (measured
+        # at the stop line, from geometry, so other layouts work too).
+        self._body_clearance = ix.body_clearance_m
+        self._lateral_spacing: dict[tuple[str, str], float] = {}
+        for f, sides in self._filter_sides.items():
+            fx, fy, _ = J.edges[f].path.pose_at(J.edges[f].length)
+            for side in sides:
+                sx, sy, _ = J.edges[side].path.pose_at(J.edges[side].length)
+                self._lateral_spacing[(f, side)] = math.hypot(fx - sx, fy - sy)
 
     def _refresh_params(self) -> None:
         agg = self.cfg.driver.aggressiveness
@@ -276,6 +289,7 @@ class Simulation:
         """
         J, ix = self.junction, self.cfg.intersection
         queue_speed = self.cfg.metrics.queue_speed
+        turned_off = self._turned_off_leaders()
         for eid in J.edge_order:
             flts = J.filters_beside.get(eid)
             lane = self.lanes[eid]
@@ -292,7 +306,8 @@ class Simulation:
                         and edge.length - veh.s > FILTER_MIN_ROOM):
                     target = next((f for f in flts if veh.v <= ix.filter_speed
                                    and veh.movement in J.filter_movements[f]
-                                   and self._filter_gap_ok(veh, self.lanes[f])), None)
+                                   and self._filter_gap_ok(veh, self.lanes[f])
+                                   and self._wide_side_gap(veh, f, turned_off)[0] >= veh.params.min_gap), None)
                 if target is None:
                     keep.append(veh)
                     continue
@@ -308,12 +323,58 @@ class Simulation:
                 self.filter_moves += 1
             self.lanes[eid] = keep
 
+    def _too_wide_beside(self, veh: Vehicle, flt: str, side: str, other: Vehicle) -> bool:
+        """Is ``other`` (in lane ``side``) too wide for bike ``veh`` to pass in filter lane ``flt``?"""
+        return (other.params.width + veh.params.width) / 2 + self._body_clearance > self._lateral_spacing[(flt, side)]
+
+    def _wide_side_gap(self, veh: Vehicle, flt: str, turned_off: dict) -> tuple[float, float]:
+        """Gap from a bike in filter lane ``flt`` to the rear of the nearest vehicle AHEAD in a lane
+        beside it that is too wide to squeeze past (a bus leaves ~5 cm to the divider). Such a
+        vehicle closes the filter gap, so the bike won't overtake it and treats its rear like a
+        leader. Filter and lane share the same ``s``.
+
+        Only vehicles whose REAR is already ahead count. A bus that drives past a bike is safe
+        while both go straight (the only danger is a turning tail swing, which the bus avoids by
+        waiting, see ``_bike_beside_body``); counting it would make the bike brake hard and the
+        bikes behind it rear-end it (an earlier version did exactly that)."""
+        gap, dv = math.inf, 0.0
+        for side in self._filter_sides.get(flt, ()):
+            for other in self.lanes[side]:
+                if other.s - other.length >= veh.s and self._too_wide_beside(veh, flt, side, other):
+                    g = other.s - other.length - veh.s
+                    if g < gap:
+                        gap, dv = g, veh.v - other.v
+            # ...and the same for one that has turned off into the box: its rear is measured along
+            # its path from the stop line. Only if that rear is AHEAD of the bike; a turning wide
+            # vehicle never starts while a bike is ahead of its rear (_bike_beside_body).
+            to_line = self.junction.edges[flt].length - veh.s
+            for other, rear_past_line in turned_off.get(side, ()):
+                g = to_line + rear_past_line
+                if 0.0 <= g < gap and self._too_wide_beside(veh, flt, side, other):
+                    gap, dv = g, veh.v - other.v
+        return gap, dv
+
+    def _bike_beside_body(self, veh: Vehicle, lane_id: str) -> bool:
+        """Is a filtering vehicle in the gap beside ``veh`` and not entirely behind it, in a gap
+        ``veh`` is too wide to share? "Not entirely behind" includes a bike waiting AHEAD at the
+        stop line: the turning body sweeps past it and the tail swings into it."""
+        for flt in self.junction.filters_beside.get(lane_id, ()):
+            for bike in self.lanes[flt]:
+                if bike.s > veh.s - veh.length and self._too_wide_beside(bike, flt, lane_id, veh):
+                    return True
+        return False
+
     @staticmethod
     def _filter_gap_ok(veh: Vehicle, flane: list[Vehicle]) -> bool:
         ahead = [x for x in flane if x.s >= veh.s - veh.length]
         behind = [x for x in flane if x.s < veh.s - veh.length]
-        if ahead and ahead[-1].s - ahead[-1].length - veh.s < veh.params.min_gap:
-            return False
+        if ahead:
+            lead = ahead[-1]
+            # Room to stop behind it with comfortable braking, not just the standstill gap: a bike
+            # swerving in at 4 m/s 2 m behind a STOPPED bike cannot avoid it.
+            closing = max(0.0, veh.v * veh.v - lead.v * lead.v) / (2.0 * veh.params.comfort_decel)
+            if lead.s - lead.length - veh.s < veh.params.min_gap + closing:
+                return False
         if behind:
             lag = behind[0]
             if veh.s - veh.length - lag.s < lag.params.min_gap + lag.v * FILTER_LAG_HEADWAY:
@@ -321,15 +382,55 @@ class Simulation:
         return True
 
     # ================================================================== driving
-    def active_connectors(self) -> set[str]:
-        """Connectors in use: occupied by a vehicle, or reserved by a committed driver."""
+    def connector_users(self) -> dict[str, list[str]]:
+        """Connectors in use -> vehicle types using them.
+
+        "Using" means any part of the BODY is on it, not just the front bumper: a 12 m bus whose
+        nose has reached the exit lane still blocks the box with the other 10 m. Also counted:
+        drivers who have committed to a connector but not reached it yet (a reservation).
+        """
         J = self.junction
-        active = {eid for eid in J.edge_order if J.edges[eid].kind == "connector" and self.lanes[eid]}
-        for e in J.approach_edges():
-            lane = self.lanes[e.id]
-            if lane and lane[0].committed:
-                active.add(lane[0].route[1])
-        return active
+        users: dict[str, list[str]] = {}
+        for eid in J.edge_order:
+            edge = J.edges[eid]
+            for veh in self.lanes[eid]:
+                if edge.kind == "connector":
+                    users.setdefault(eid, []).append(veh.vtype)
+                elif veh.route_idx > 0 and veh.s < veh.length:
+                    prev = veh.route[veh.route_idx - 1]
+                    if J.edges[prev].kind == "connector":  # rear still in the box
+                        users.setdefault(prev, []).append(veh.vtype)
+                if edge.is_approach and veh is self.lanes[eid][0] and veh.committed:
+                    users.setdefault(veh.route[1], []).append(veh.vtype)
+        return users
+
+    def active_connectors(self) -> set[str]:
+        """Connectors in use: occupied by any part of a vehicle, or reserved by a committed driver."""
+        return set(self.connector_users())
+
+    def _turned_off_leaders(self) -> dict[str, list[tuple[Vehicle, float]]]:
+        """Per approach lane: vehicles that left it onto a connector and whose body is still in
+        the box, with the distance their REAR has travelled past the stop line.
+
+        WHY: a driver normally follows the vehicle ahead on its own route. If the car ahead turns
+        right while I go straight, it vanishes from my route the moment its nose passes the stop
+        line, yet its tail is still right in front of me. Without this, the follower drove into the
+        tail of turning buses (seen as overlapping bodies in the 3D view).
+        """
+        J = self.junction
+        out: dict[str, list[tuple[Vehicle, float]]] = {}
+        for eid in J.edge_order:
+            edge = J.edges[eid]
+            for veh in self.lanes[eid]:
+                if edge.kind == "connector":
+                    cx, along = edge, veh.s
+                elif veh.route_idx > 0 and veh.s < veh.length and J.edges[veh.route[veh.route_idx - 1]].kind == "connector":
+                    cx = J.edges[veh.route[veh.route_idx - 1]]
+                    along = cx.length + veh.s
+                else:
+                    continue
+                out.setdefault(cx.source_id, []).append((veh, along - veh.length))
+        return out
 
     def _lookahead(self, veh: Vehicle, edge_len: float) -> tuple[float, float]:
         """Gap and approach rate to the nearest vehicle ahead on the next edges of the route."""
@@ -353,12 +454,22 @@ class Simulation:
                       for cx in self.junction.feeders[out_id] for v in self.lanes[cx])
         return free - pending >= veh.length + veh.params.min_gap
 
-    def _entry_decision(self, veh: Vehicle, edge, active_cx: set[str]) -> tuple[EntryDecision, str]:
-        cx = self.junction.edges[veh.route[1]]
+    def _entry_decision(self, veh: Vehicle, edge, users: dict[str, list[str]]) -> tuple[EntryDecision, str]:
+        J = self.junction
+        cx = J.edges[veh.route[1]]
         light = self.signals.movement_state(edge.arm, cx.movement)
         if light == "R":
             return EntryDecision.STOP, light
-        if self.junction.conflicts[cx.id] & active_cx or not self._exit_has_space(veh, cx.target_id):
+        # Blocked if anyone is using a path that conflicts with ours FOR THIS PAIR OF VEHICLES
+        # (a bus sweeps more of the box than a bike; see Junction.compute_body_conflicts).
+        for other, types in users.items():
+            if other != cx.id and any(J.conflicts_for(cx.id, veh.vtype, other, t) for t in types):
+                return EntryDecision.STOP, light
+        if not self._exit_has_space(veh, cx.target_id):
+            return EntryDecision.STOP, light
+        if cx.movement != "straight" and self._bike_beside_body(veh, edge.id):
+            # A turning vehicle's tail swings outwards. A bus leaves ~5 cm to a bike waiting in
+            # the filter gap beside it, so it lets the bike go first (a mirror check).
             return EntryDecision.STOP, light
         walking = self.peds.crossing_arms
         if walking and (edge.arm in walking or self._cx_exit_arm[cx.id] in walking):
@@ -402,7 +513,8 @@ class Simulation:
 
     def _move_vehicles(self, dt: float) -> None:
         edges = self.junction.edges
-        active_cx = self.active_connectors()
+        users = self.connector_users()
+        turned_off = self._turned_off_leaders()
         self._queue_tail = self._queue_tails()
 
         order: list[Vehicle] = []
@@ -415,16 +527,31 @@ class Simulation:
                     gap, dv = lead.s - lead.length - veh.s, veh.v - lead.v
                 else:
                     gap, dv = self._lookahead(veh, edge.length)
+                    if edge.is_approach:
+                        # Keep following a vehicle that left this lane on another path (see
+                        # _turned_off_leaders): the gap is to its rear, measured along the road.
+                        to_line = edge.length - veh.s
+                        for lead, rear_past_line in turned_off.get(eid, ()):
+                            if lead.route[1] != veh.route[1] and to_line + rear_past_line < gap:
+                                gap, dv = to_line + rear_past_line, veh.v - lead.v
                     if edge.is_approach and not veh.committed:
-                        decision, light = self._entry_decision(veh, edge, active_cx)
+                        decision, light = self._entry_decision(veh, edge, users)
                         if decision is EntryDecision.COMMIT:
                             veh.committed, veh.commit_signal = True, light
-                            active_cx.add(veh.route[1])
+                            users.setdefault(veh.route[1], []).append(veh.vtype)
                         elif decision is EntryDecision.STOP:
                             buffer = min(STOP_BUFFER, veh.params.min_gap - STOP_MIN_MARGIN)
                             stop_gap = edge.length + buffer - veh.s
                             if stop_gap < gap:
                                 gap, dv = stop_gap, veh.v  # stop line is a stationary "leader"
+                if edge.kind == "filter":
+                    # Every bike in a filter gap (not only the first: the ones behind would
+                    # otherwise just follow it past the obstacle) must not overtake a vehicle too
+                    # wide to share the gap, nor ride into the swinging tail of one that is
+                    # turning off from a lane beside it. Narrow vehicles (cars) leave room.
+                    side_gap, side_dv = self._wide_side_gap(veh, eid, turned_off)
+                    if side_gap < gap:
+                        gap, dv = side_gap, side_dv
                 order.append(veh)
                 gaps.append(gap)
                 dvs.append(dv)
@@ -497,11 +624,35 @@ class Simulation:
             filtered=veh.filtered))
 
     # ================================================================== outputs
+    def rear_point(self, veh: Vehicle) -> tuple[float, float]:
+        """Where the vehicle's rear is: ``length`` metres back along its route (may be the
+        previous edge, e.g. a bus whose nose is in the box while its tail is still on the lane)."""
+        idx, s = veh.route_idx, veh.s - veh.length
+        while s < 0 and idx > 0:
+            idx -= 1
+            s += self.junction.edges[veh.route[idx]].length
+        x, y, _ = self.junction.edges[veh.route[idx]].path.pose_at(max(s, 0.0))
+        return x, y
+
     def lane_poses(self, eid: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """(x, y, heading) of every vehicle on one edge, front first, including the drawing-only
-        sideways offset of bikes moving into a filter gap."""
+        sideways offset of bikes moving into a filter gap.
+
+        x, y is the front bumper. On a curve the heading is that of the CHORD from the rear point
+        to the front point, not the path's direction at the bumper: a body drawn along the
+        tangent at its nose swings its tail far off the road on a tight turn (a 12 m bus by
+        several metres). Along the chord, front and rear both sit on the path, the way a real
+        vehicle's axles do. On straight lanes the two are identical."""
         lane = self.lanes[eid]
         xs, ys, hs = self.junction.edges[eid].path.poses_at([veh.s for veh in lane])
+        edge = self.junction.edges[eid]
+        if edge.kind == "connector" or any(veh.s < veh.length and veh.route_idx > 0 for veh in lane):
+            hs = hs.copy()
+            for i, veh in enumerate(lane):
+                if edge.kind == "connector" or (veh.s < veh.length and veh.route_idx > 0):
+                    rx, ry = self.rear_point(veh)
+                    if math.hypot(xs[i] - rx, ys[i] - ry) > 1e-6:
+                        hs[i] = math.atan2(ys[i] - ry, xs[i] - rx)
         lat = np.array([veh.lat_shift for veh in lane])
         if lat.any():
             xs, ys = xs - np.sin(hs) * lat, ys + np.cos(hs) * lat

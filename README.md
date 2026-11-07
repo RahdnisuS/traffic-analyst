@@ -37,7 +37,7 @@ per level, each level a fresh 25-minute run) until an approach can no longer kee
 
 | Junction | Signals | Capacity (sustained) | Breaks down at | Peak while overloaded |
 |---|---|---|---|---|
-| 4-way, 2+2 lanes per arm | fixed time, 25 s green | **2,077 ± 115 veh/h** | 550–600 veh/h per approach | ~2,320 veh/h |
+| 4-way, 2+2 lanes per arm | fixed time, 25 s green | **1,790 ± 54 veh/h** | 500 veh/h per approach | ~2,070 veh/h |
 
 "Breaks down" means oversaturation: an approach serves under 95% of the vehicles arriving, so its
 queue grows without limit. The junction never literally gridlocks, because drivers don't enter the

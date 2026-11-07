@@ -77,6 +77,9 @@ intersection:
   conflict_distance_m: 2.5 # two turning paths closer than this are treated as conflicting
   filter_speed: 5.5       # m/s; bikes squeezing past queued (near-stationary) vehicles ride slowly (~20 km/h)
   filter_conflict_distance_m: 1.5 # bike paths only: a 0.8 m bike fits beside a car 1.75 m away
+  body_clearance_m: 0.3   # on top of the centreline test: two paths also conflict for a given pair of
+                          # vehicle types if their BODIES (length x width, swept through the turn)
+                          # would come closer than this. Matters for buses, whose body cuts the corner
   filter_trigger_gap: 12  # m; a bike starts filtering once a slow (queued) leader is this close
   lateral_speed: 1.2      # m/s sideways while moving into the filter gap (smooths the drawing)
 

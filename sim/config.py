@@ -102,6 +102,7 @@ class IntersectionSettings(_Strict):
     conflict_distance_m: float = Field(2.5, gt=0)
     filter_speed: float = Field(5.5, gt=0)        # m/s cap while squeezing past queued vehicles
     filter_conflict_distance_m: float = Field(1.5, gt=0)  # bike paths: narrower vehicle, smaller margin
+    body_clearance_m: float = Field(0.3, ge=0)    # min gap between two vehicle BODIES in the box
     filter_trigger_gap: float = Field(12.0, gt=0)  # a bike starts filtering when a slow leader is this close
     lateral_speed: float = Field(1.2, gt=0)       # m/s sideways when changing into the filter lane (visual)
 
