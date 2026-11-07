@@ -1,0 +1,40 @@
+# Traffic Analyst: single source of truth for all tunable parameters.
+# Units: metres, seconds, m/s, m/s^2, vehicles/hour (vph).
+# Every section is validated by sim/config.py (Pydantic). Unknown keys are errors.
+
+sim:
+  dt: 0.1                 # integration step (s). 0.1 s is the usual choice for IDM: stable and cheap.
+  seed: 42                # master RNG seed; same seed + same config gives an identical run
+  duration_s: 600         # default run length for the headless CLI
+  junction: junctions/four_way_2x2.json
+
+# Car-following (IDM) parameters per vehicle type. Phase 4 adds bike/auto/bus.
+vehicle_types:
+  car:
+    length: 4.5           # m
+    width: 1.8            # m (used by renderers; lateral logic arrives in Phase 4)
+    max_accel: 1.5        # IDM "a": comfortable max acceleration
+    comfort_decel: 2.0    # IDM "b": comfortable braking
+    max_decel: 8.0        # physical braking limit (clamps IDM in emergencies)
+    desired_speed: 13.9   # IDM "v0": 50 km/h urban
+    time_headway: 1.5     # IDM "T": desired time gap to the leader
+    min_gap: 2.0          # IDM "s0": bumper-to-bumper gap when stopped
+    accel_exponent: 4.0   # IDM "delta": how sharply acceleration drops near v0
+
+demand:
+  per_approach_vph: {N: 450, E: 350, S: 450, W: 350}
+  turn_probabilities: {left: 0.25, straight: 0.55, right: 0.20}
+  vehicle_mix: {car: 1.0}
+  speed_factor_std: 0.08  # driver heterogeneity: v0 is scaled by N(1, std), clipped
+
+signals:
+  controller: fixed
+  green_s: 25             # per phase (a single number, or a list with one value per phase)
+  amber_s: 3
+  all_red_s: 2            # clearance so stragglers leave the box before conflicting traffic starts
+  min_green_s: 7          # safety floor; also enforced on the RL agent later
+
+intersection:
+  turn_lateral_accel: 2.5 # m/s^2; turn speed = sqrt(a_lat * radius)
+  lookahead_m: 150        # how far ahead a driver scans for a leader across edges
+  conflict_distance_m: 2.5 # two turning paths closer than this are treated as conflicting

@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+# generated artefacts (kept out of git; regenerate from code)
+data/runs/
+chroma/
+rl/models/*.zip
+.claude/

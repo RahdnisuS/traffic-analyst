@@ -1,0 +1,5 @@
+# Phase 1: core simulation (later phases append their dependencies here)
+numpy>=2.0
+pydantic>=2.6
+pyyaml>=6.0
+pytest>=8.0

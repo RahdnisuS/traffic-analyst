@@ -1,0 +1,22 @@
+{
+  "name": "four_way_2x2",
+  "description": "Symmetric 4-way junction, left-hand traffic, 2 inbound + 2 outbound lanes per arm, 4-phase split signalling (one approach green at a time).",
+  "lane_width": 3.5,
+  "approach_length": 150.0,
+  "exit_length": 80.0,
+  "crosswalk_width": 3.0,
+  "corner_margin": 1.5,
+  "speed_limit": 13.9,
+  "arms": {
+    "N": {"in_lanes": [["left", "straight"], ["straight", "right"]], "out_lanes": 2},
+    "E": {"in_lanes": [["left", "straight"], ["straight", "right"]], "out_lanes": 2},
+    "S": {"in_lanes": [["left", "straight"], ["straight", "right"]], "out_lanes": 2},
+    "W": {"in_lanes": [["left", "straight"], ["straight", "right"]], "out_lanes": 2}
+  },
+  "phases": [
+    {"name": "N", "green": {"N": ["left", "straight", "right"]}},
+    {"name": "E", "green": {"E": ["left", "straight", "right"]}},
+    {"name": "S", "green": {"S": ["left", "straight", "right"]}},
+    {"name": "W", "green": {"W": ["left", "straight", "right"]}}
+  ]
+}
