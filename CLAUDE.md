@@ -26,6 +26,8 @@ pytest -q                           # all tests
 pytest tests/test_idm.py::test_name # single test
 ```
 
+Checking the frontend visually (no browser tool needed): run the server, drive it over the WebSocket (the session is shared, so commands from a script show up in every browser), and screenshot with headless Edge using its own profile: `msedge --headless=new --use-angle=swiftshader --enable-unsafe-swiftshader --user-data-dir=<.claude/edge-profile> --window-size=1440,1250 --timeout=14000 --screenshot=<file> http://127.0.0.1:<port>/` (add `--blink-settings=preferredColorScheme=1` for light). Headless clamps windows to ~500 px wide, so test phone widths by loading the page in a 390 px iframe. Never kill `msedge.exe`: it closes the user's own browser.
+
 `tests/conftest.py` puts the repo root on `sys.path`, so run pytest from the root. In the Bash tool the venv activation doesn't persist between calls; call `.venv/Scripts/python -m pytest -q` (or `-m sim`, `-m server`) directly.
 
 ## Architecture

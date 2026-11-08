@@ -132,7 +132,7 @@ Phase 14 – Unit tests (IDM, signal logic, scenario parser, retrieval), error h
       return −148 vs gap-out −156 and fixed timer −179 (passes gap-out by 50k decisions). Held-out seeds 101–105:
       total waiting −26% / −15% / −11% vs the fixed timer and −7% / −5% / −7% vs gap-out at 250 / 400 / 500 veh/h;
       pedestrians wait longer than under gap-out. Results: `experiments/results/rl/20261108-185428/`.
-- [x] Phase 8 – AI in the UI (111 tests). AI on/off switch (live hand-over), side-by-side comparison
+- [x] Phase 8 – AI in the UI (commit bf440cc; 111 tests). AI on/off switch (live hand-over), side-by-side comparison
       (twin sim, same seed, lockstep, shared camera) with the result in words after a 1-minute warm-up.
       Checked in headless Edge: 1440 px dark/light, 390 px; design critique (impeccable) 25/40 -> its 6
       priority issues fixed (keep-side stop, fixed -> AI order everywhere, contrast, one stop control,

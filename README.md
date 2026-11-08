@@ -24,8 +24,8 @@ pip install -r requirements.txt
 python -m sim --duration 900  # headless run; logs to data/runs/<run_id>/ (use --no-log to skip)
 python -m server              # dashboard at http://127.0.0.1:8000
 python -m bench               # capacity benchmark (~70 s); results in experiments/results/benchmark/
-python -m rl.train            # train the RL signal controller (~20 min on 14 cores)
-python -m rl.evaluate         # compare it with the fixed timer on held-out seeds
+python -m rl.train            # train the RL signal controller (~18 min on 14 cores)
+python -m rl.evaluate         # compare it with the fixed timer and a gap-out rule on held-out seeds
 python -m sim --controller rl # headless run with the trained agent
 pytest -q
 ```
@@ -36,6 +36,9 @@ signal timing live. The junction opens in the **3D** view (drag to pan, wheel to
 rotate, **Fit** to reset); **2D** switches to the top-down debug view. Add `?view=2d` to the URL to
 start in 2D, and press **F** for a frame-rate readout. If WebGL or the CDN is unavailable, the
 dashboard stays in 2D.
+
+Keyboard: **Space** play/pause · **A** AI on/off · **C** compare side by side · **Q/E** rotate (3D) ·
+**F** frame-rate readout.
 
 ### AI in the dashboard
 - **AI signal control** (switch, or press **A**) hands the running junction to the trained agent,
