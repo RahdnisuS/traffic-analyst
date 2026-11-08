@@ -205,6 +205,7 @@ class RLSettings(_Strict):
     ped_rate_ph: tuple[float, float] = (0.0, 500.0)
     n_envs: int = Field(8, ge=1)
     total_timesteps: int = Field(300_000, ge=1)
+    curve_eval_every: int = Field(25_000, ge=1)
     seed: int = 0
     eval_seeds: list[int] = Field(default_factory=lambda: [101, 102, 103, 104, 105])
     eval_demand_vph: dict[str, float] = Field(default_factory=lambda: {"low": 250.0, "medium": 400.0, "high": 500.0})

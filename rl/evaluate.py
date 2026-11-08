@@ -1,9 +1,13 @@
-"""Compare the trained agent with the fixed timer: ``python -m rl.evaluate``.
+"""Compare the trained agent with the fixed timer and the gap-out rule: ``python -m rl.evaluate``.
 
 Same seeds, same traffic, same engine; only the controller differs. Uses the held-out
 ``rl.eval_seeds`` (never used in training) at the ``rl.eval_demand_vph`` levels (with the
 config's per-approach ratios, so N/S stay busier than E/W). Phase 10 runs the full experiment
-(30+ scenarios, plus an actuated controller); this is the Phase 7 sanity check.
+(30+ scenarios); this is the Phase 7 check.
+
+WHY gap-out is in here: beating a fixed timer is easy for anything adaptive. Gap-out (switch once
+the green approach has no queue, cap 60 s) is the simple actuated rule a traffic engineer would
+write first, so it is the bar that shows whether the learned policy is worth its complexity.
 
 Reports per controller: total waiting (what the agent optimises), mean control delay per trip,
 throughput, vehicles still queued off the map at the end, and the PEDESTRIANS' mean wait: the
@@ -15,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import statistics
+import sys
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -22,7 +27,7 @@ from pathlib import Path
 from sim.config import Config, load_config
 from sim.metrics import MetricsCollector
 
-from .env import make_sim
+from .env import GapOutPolicy, make_sim
 from .features import waiting_now
 
 
@@ -37,7 +42,9 @@ def run_one(args) -> dict:
     cfg_json, controller, level, mean_vph, seed, model_path = args
     cfg = Config.model_validate_json(cfg_json)
     policy = None
-    if controller == "rl":
+    if controller == "gap_out":
+        policy = GapOutPolicy(cfg.rl.decision_interval_s)
+    elif controller == "rl":
         from .policy import RLPolicy
         policy = RLPolicy.load(cfg, model_path)
     sim = make_sim(cfg, eval_traffic(cfg, mean_vph, seed), policy=policy)
@@ -57,51 +64,64 @@ def run_one(args) -> dict:
             "greens": phase_changes, "emergency_stops": sim.counters.emergency_stops}
 
 
+CONTROLLERS = ("fixed", "gap_out", "rl")
+LABEL = {"fixed": "fixed", "gap_out": "gap-out", "rl": "RL"}
+
+
+def _pct(new, old):
+    return round(100 * (new - old) / old, 1) if old and new is not None else None
+
+
 def summarise(rows: list[dict], levels: list[str]) -> list[dict]:
     out = []
     for level in levels:
         line = {"level": level}
-        for c in ("fixed", "rl"):
+        for c in CONTROLLERS:
             rs = [r for r in rows if r["level"] == level and r["controller"] == c]
             for k in ("waiting_veh_s", "mean_delay_s", "completed", "backlog_end", "mean_ped_wait_s", "greens"):
                 vals = [r[k] for r in rs if r[k] is not None]
                 line[f"{c}_{k}"] = round(statistics.fmean(vals), 1) if vals else None
             line[f"{c}_mean_vph"] = rs[0]["mean_vph"] if rs else None
-        f, a = line["fixed_waiting_veh_s"], line["rl_waiting_veh_s"]
-        line["waiting_change_pct"] = round(100 * (a - f) / f, 1) if f else None
-        fd, ad = line["fixed_mean_delay_s"], line["rl_mean_delay_s"]
-        line["delay_change_pct"] = round(100 * (ad - fd) / fd, 1) if fd and ad is not None else None
+        for base in ("fixed", "gap_out"):
+            line[f"waiting_vs_{base}_pct"] = _pct(line["rl_waiting_veh_s"], line[f"{base}_waiting_veh_s"])
+            line[f"delay_vs_{base}_pct"] = _pct(line["rl_mean_delay_s"], line[f"{base}_mean_delay_s"])
         out.append(line)
     return out
 
 
 def render(summary: list[dict], seeds: list[int], episode_s: float) -> str:
-    lines = ["# RL agent vs fixed timer", "",
+    def trio(s, k, fmt="{:.0f}", scale=1.0):
+        return " / ".join("-" if s[f"{c}_{k}"] is None else fmt.format(s[f"{c}_{k}"] / scale) for c in CONTROLLERS)
+
+    lines = ["# RL agent vs fixed timer and gap-out rule", "",
              f"Held-out seeds {', '.join(map(str, seeds))}; {episode_s:.0f} s per run; mean over seeds. "
-             "Negative change = the agent is better.", "",
-             "| Demand (veh/h per approach) | Total waiting, fixed → RL (veh·h) | Change | Mean delay, fixed → RL (s) | Change "
-             "| Trips completed, fixed → RL | Ped wait, fixed → RL (s) | Greens, fixed → RL |",
-             "|---|---|---|---|---|---|---|---|"]
+             "Values are fixed / gap-out / RL. Negative change = the agent is better.", "",
+             "| Demand (veh/h per approach) | Total waiting (veh·h) | RL vs fixed | RL vs gap-out "
+             "| Mean delay (s) | RL vs fixed | RL vs gap-out | Trips completed | Ped wait (s) | Greens |",
+             "|---|---|---|---|---|---|---|---|---|---|"]
     for s in summary:
         lines.append(
-            f"| {s['level']} ({s['fixed_mean_vph']:.0f}) | {s['fixed_waiting_veh_s'] / 3600:.1f} → {s['rl_waiting_veh_s'] / 3600:.1f} "
-            f"| {s['waiting_change_pct']:+.1f}% | {s['fixed_mean_delay_s']} → {s['rl_mean_delay_s']} | {s['delay_change_pct']:+.1f}% "
-            f"| {s['fixed_completed']:.0f} → {s['rl_completed']:.0f} | {s['fixed_mean_ped_wait_s']} → {s['rl_mean_ped_wait_s']} "
-            f"| {s['fixed_greens']:.0f} → {s['rl_greens']:.0f} |")
+            f"| {s['level']} ({s['fixed_mean_vph']:.0f}) | {trio(s, 'waiting_veh_s', '{:.2f}', 3600)} "
+            f"| {s['waiting_vs_fixed_pct']:+.1f}% | {s['waiting_vs_gap_out_pct']:+.1f}% "
+            f"| {trio(s, 'mean_delay_s', '{:.1f}')} | {s['delay_vs_fixed_pct']:+.1f}% | {s['delay_vs_gap_out_pct']:+.1f}% "
+            f"| {trio(s, 'completed')} | {trio(s, 'mean_ped_wait_s', '{:.1f}')} | {trio(s, 'greens')} |")
     return "\n".join(lines) + "\n"
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Evaluate the trained RL controller against the fixed timer.")
+    ap = argparse.ArgumentParser(description="Evaluate the trained RL controller against the fixed timer and gap-out.")
     ap.add_argument("--model", default=None, help="model path (default: rl.model_path)")
     ap.add_argument("--out", default=None, help="results folder (default: next to the latest training run)")
     args = ap.parse_args()
+    # Windows consoles default to a legacy code page; the report uses arrows (→).
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     cfg = load_config()
     model = args.model or str(cfg.rl_model_path())
     levels = list(cfg.rl.eval_demand_vph)
     jobs = [(cfg.model_dump_json(), c, lvl, cfg.rl.eval_demand_vph[lvl], s, model)
-            for lvl in levels for s in cfg.rl.eval_seeds for c in ("fixed", "rl")]
-    with ProcessPoolExecutor(max_workers=min(len(jobs), 12)) as ex:
+            for lvl in levels for s in cfg.rl.eval_seeds for c in CONTROLLERS]
+    with ProcessPoolExecutor(max_workers=min(len(jobs), 14)) as ex:
         rows = list(ex.map(run_one, jobs))
     summary = summarise(rows, levels)
     report = render(summary, cfg.rl.eval_seeds, cfg.rl.episode_s)

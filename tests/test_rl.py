@@ -8,7 +8,8 @@ import pytest
 pytest.importorskip("gymnasium")
 pytest.importorskip("stable_baselines3")
 
-from rl.env import KEEP, SWITCH, ExternalPolicy, SignalEnv, episode_traffic, fixed_time_return, make_sim  # noqa: E402
+from rl.env import (KEEP, SWITCH, ExternalPolicy, GapOutPolicy, SignalEnv, episode_traffic,  # noqa: E402
+                    fixed_time_return, gap_out_return, make_sim)
 from rl.features import DecisionClock, feature_names, observe, waiting_now  # noqa: E402
 from rl.policy import RLPolicy  # noqa: E402
 from sim.config import load_config  # noqa: E402
@@ -184,3 +185,17 @@ def test_fixed_time_baseline_uses_the_same_accounting(cfg):
         w += waiting_now(sim) * sim.dt
     assert res["waiting_veh_s"] == pytest.approx(w)
     assert res["return"] == pytest.approx(-w / cfg.rl.reward_scale - cfg.rl.switch_penalty * res["switches"])
+
+
+def test_gap_out_policy_matches_the_training_baseline(cfg):
+    """rl.evaluate runs gap-out as a SignalPolicy; the training curve scores it through the env.
+    Both must be the same controller, or the two reports would compare against different bars."""
+    res = gap_out_return(cfg, TRAFFIC)
+    sim = make_sim(cfg, TRAFFIC, policy=GapOutPolicy(cfg.rl.decision_interval_s))
+    w = 0.0
+    for _ in range(round(cfg.rl.episode_s / sim.dt)):
+        sim.step()
+        w += waiting_now(sim) * sim.dt
+    greens = sum(1 for e in sim.signals.events if e.stage == "green") - 1
+    assert w == pytest.approx(res["waiting_veh_s"])
+    assert greens > 3

@@ -2,8 +2,8 @@
 
 Writes:
   rl/models/ppo_signal.zip (+ .json metadata)    the trained network, loaded by RLPolicy
-  experiments/results/rl/<timestamp>/            progress.csv (SB3 log), training_curve.png,
-                                                 train_meta.json
+  experiments/results/rl/<timestamp>/            progress.csv (SB3 log), greedy_eval.csv,
+                                                 training_curve.png, train_meta.json
 
 WHY PPO: the action is discrete (keep / switch), the reward is noisy (random arrivals), and
 we have plenty of cheap simulated experience. PPO is the standard robust choice there: its
@@ -14,6 +14,13 @@ masking, so decisions where switching is impossible don't feed noise into the po
 
 The training curve is only meaningful next to a BASELINE: the fixed timer's return on the same
 kind of random traffic, scored with the same reward. The agent is useful once it beats that line.
+
+WHY two agent lines: SB3's "mean episode return" is the agent WHILE TRAINING, sampling its
+actions at random in proportion to their probability (that is how PPO explores). Deployed, it
+takes the most likely action every time. The first full run's training line sat on the fixed
+timer and below gap-out, yet the deployed agent beat both: exploration was costing ~30 points.
+So every ``rl.curve_eval_every`` decisions the current network is also scored greedily on the
+SAME episodes as the baselines; that line is the one to compare with them.
 """
 
 from __future__ import annotations
@@ -21,6 +28,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -28,7 +36,7 @@ import numpy as np
 
 from sim.config import load_config
 
-from .env import SignalEnv, episode_traffic, fixed_time_return, gap_out_return
+from .env import SignalEnv, agent_return, episode_traffic, fixed_time_return, gap_out_return
 
 BASELINE_EPISODES = 24
 
@@ -39,33 +47,50 @@ def _make_env(cfg):
     return thunk
 
 
-def _baseline_job(args):
+def curve_traffics(cfg, n: int) -> list[dict]:
+    """The ``n`` random training-style episodes every curve line is scored on."""
+    rng = np.random.default_rng(cfg.rl.seed + 10_000)  # its own stream: not the training episodes
+    return [episode_traffic(cfg, rng) for _ in range(n)]
+
+
+def _score_job(args):
     cfg_json, kind, traffic = args
     from sim.config import Config
-    fn = fixed_time_return if kind == "fixed" else gap_out_return
-    return kind, fn(Config.model_validate_json(cfg_json), traffic)
+    cfg = Config.model_validate_json(cfg_json)
+    if kind == "fixed":
+        return kind, fixed_time_return(cfg, traffic)
+    if kind == "gap_out":
+        return kind, gap_out_return(cfg, traffic)
+    from sb3_contrib import MaskablePPO  # kind = path of a saved model
+    return "agent", agent_return(cfg, traffic, MaskablePPO.load(kind, device="cpu"))
 
 
-def baselines(cfg, n: int, workers: int) -> dict:
-    """Mean return of the fixed timer and of the gap-out rule on the same ``n`` random
-    training-style episodes (scored with the agent's reward)."""
-    from concurrent.futures import ProcessPoolExecutor
+def _summary(results: list[dict]) -> dict:
+    rets = [r["return"] for r in results]
+    return {"mean_return": float(np.mean(rets)), "std_return": float(np.std(rets)),
+            "mean_switches": float(np.mean([r["switches"] for r in results])), "episodes": len(results)}
 
-    rng = np.random.default_rng(cfg.rl.seed + 10_000)  # its own stream: not the training episodes
-    traffics = [episode_traffic(cfg, rng) for _ in range(n)]
+
+def baselines(cfg, traffics: list[dict], pool: ProcessPoolExecutor) -> dict:
+    """Mean return of the fixed timer and of the gap-out rule on ``traffics``
+    (scored with the agent's reward)."""
     jobs = [(cfg.model_dump_json(), kind, t) for kind in ("fixed", "gap_out") for t in traffics]
-    with ProcessPoolExecutor(max_workers=workers) as ex:
-        res = list(ex.map(_baseline_job, jobs))
-    out = {}
-    for kind in ("fixed", "gap_out"):
-        rets = [r["return"] for k, r in res if k == kind]
-        out[kind] = {"mean_return": float(np.mean(rets)), "std_return": float(np.std(rets)), "episodes": n}
-    return out
+    res = list(pool.map(_score_job, jobs))
+    return {kind: _summary([r for k, r in res if k == kind]) for kind in ("fixed", "gap_out")}
 
 
-def _behaviour_callback():
+def greedy_eval(model, cfg, traffics: list[dict], pool: ProcessPoolExecutor, scratch: Path) -> dict:
+    """The current network, most-likely action every time, on ``traffics``. The model is saved to
+    ``scratch`` so the worker processes can load it (the training envs are idle meanwhile)."""
+    model.save(scratch)
+    res = list(pool.map(_score_job, [(cfg.model_dump_json(), str(scratch), t) for t in traffics]))
+    return _summary([r for _, r in res])
+
+
+def _behaviour_callback(evaluate, every: int, rows: list[dict]):
     """Logs WHAT the agent does, not just its score: switches and waiting per episode. A falling
-    return alone can't tell "switches constantly" from "never switches"."""
+    return alone can't tell "switches constantly" from "never switches". Also runs ``evaluate``
+    (the greedy evaluation) every ``every`` decisions and appends the result to ``rows``."""
     from stable_baselines3.common.callbacks import BaseCallback
 
     class Behaviour(BaseCallback):
@@ -73,6 +98,12 @@ def _behaviour_callback():
             return True
 
         def _on_rollout_end(self) -> None:
+            if self.num_timesteps >= (len(rows) + 1) * every:
+                res = evaluate(self.model)
+                rows.append({"timesteps": self.num_timesteps, **res})
+                self.logger.record("eval/greedy_return", res["mean_return"])
+                print(f"  greedy eval @ {self.num_timesteps:,}: return {res['mean_return']:.1f} "
+                      f"({res['mean_switches']:.0f} switches)", flush=True)
             eps = [e for e in self.model.ep_info_buffer if "episode_switches" in e]
             if eps:
                 self.logger.record("rollout/ep_switches_mean", float(np.mean([e["episode_switches"] for e in eps])))
@@ -81,7 +112,7 @@ def _behaviour_callback():
     return Behaviour()
 
 
-def plot_curve(progress_csv: Path, baseline: dict, out: Path) -> None:
+def plot_curve(progress_csv: Path, baseline: dict, greedy: list[dict], out: Path) -> None:
     import csv
 
     import matplotlib
@@ -95,7 +126,10 @@ def plot_curve(progress_csv: Path, baseline: dict, out: Path) -> None:
                 xs.append(float(row["time/total_timesteps"]))
                 ys.append(float(row["rollout/ep_rew_mean"]))
     fig, ax = plt.subplots(figsize=(7, 4.2), dpi=130)
-    ax.plot(xs, ys, lw=1.6, label="PPO agent (mean episode return)")
+    ax.plot(xs, ys, lw=1.2, color="#7aa6d6", alpha=0.8, label="PPO agent while training (sampled actions)")
+    if greedy:
+        ax.plot([g["timesteps"] for g in greedy], [g["mean_return"] for g in greedy], "o-", lw=1.8, ms=4,
+                color="#1f4e8c", label=f"PPO agent, best action, same traffic ({greedy[-1]['mean_return']:.0f})")
     ax.axhline(baseline["fixed"]["mean_return"], color="#d03b3b", ls="--", lw=1.2,
                label=f"fixed timer, same traffic ({baseline['fixed']['mean_return']:.0f})")
     ax.axhline(baseline["gap_out"]["mean_return"], color="#1baf7a", ls=":", lw=1.4,
@@ -133,10 +167,21 @@ def main() -> None:
     out = cfg.rl_results_path() / (f"{stamp}_quick" if args.quick else stamp)
     out.mkdir(parents=True, exist_ok=True)
 
-    print(f"Baselines on {BASELINE_EPISODES} random episodes...", flush=True)
-    baseline = baselines(cfg, BASELINE_EPISODES, n_envs)
+    n_curve = 4 if args.quick else BASELINE_EPISODES
+    every = 2048 if args.quick else r.curve_eval_every
+    traffics = curve_traffics(cfg, n_curve)
+    # One pool for the baselines and every greedy evaluation: worker start-up (torch import) is
+    # paid once, not at each evaluation.
+    pool = ProcessPoolExecutor(max_workers=n_envs)
+    print(f"Baselines on {n_curve} random episodes...", flush=True)
+    baseline = baselines(cfg, traffics, pool)
     for k, b in baseline.items():
         print(f"  {k}: mean return {b['mean_return']:.1f} ± {b['std_return']:.1f}", flush=True)
+    greedy: list[dict] = []
+    scratch = out / "_eval_model.zip"
+
+    def evaluate(m):
+        return greedy_eval(m, cfg, traffics, pool, scratch)
 
     venv = VecMonitor(SubprocVecEnv([_make_env(cfg) for _ in range(n_envs)]),
                       info_keywords=("episode_waiting_veh_s", "episode_switches"))
@@ -155,14 +200,24 @@ def main() -> None:
     model.set_logger(configure(str(out), ["csv", "stdout"]))
     print(f"Training PPO: {timesteps:,} decisions on {n_envs} parallel simulations -> {out}", flush=True)
     t0 = time.perf_counter()
-    model.learn(total_timesteps=timesteps, progress_bar=False, callback=_behaviour_callback())
+    model.learn(total_timesteps=timesteps, progress_bar=False, callback=_behaviour_callback(evaluate, every, greedy))
     wall = time.perf_counter() - t0
     venv.close()
+    if not greedy or greedy[-1]["timesteps"] < model.num_timesteps:  # always score the final model
+        greedy.append({"timesteps": model.num_timesteps, **evaluate(model)})
+        print(f"  greedy eval @ {model.num_timesteps:,}: return {greedy[-1]['mean_return']:.1f}", flush=True)
+    pool.shutdown()
+    scratch.unlink(missing_ok=True)
+    with open(out / "greedy_eval.csv", "w", encoding="utf-8", newline="") as fh:
+        import csv
+        w = csv.DictWriter(fh, fieldnames=list(greedy[0]))
+        w.writeheader()
+        w.writerows(greedy)
 
-    plot_curve(out / "progress.csv", baseline, out / "training_curve.png")
+    plot_curve(out / "progress.csv", baseline, greedy, out / "training_curve.png")
     meta = {"created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "timesteps": timesteps, "n_envs": n_envs, "wall_time_s": round(wall, 1),
-            "baseline_fixed_time": baseline, "rl_settings": r.model_dump(),
+            "baseline_fixed_time": baseline, "greedy_eval": greedy, "rl_settings": r.model_dump(),
             "features": SignalEnv(cfg).names, "quick": args.quick}
     (out / "train_meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     if not args.quick:

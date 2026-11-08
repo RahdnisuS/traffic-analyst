@@ -134,6 +134,19 @@ def fixed_time_return(cfg: Config, traffic: dict) -> dict:
             "waiting_veh_s": waited, "switches": phase_changes, "completed": sim.counters.completed}
 
 
+def agent_return(cfg: Config, traffic: dict, model) -> dict:
+    """A trained (Maskable)PPO model on the same traffic, taking its MOST LIKELY action every time
+    (as RLPolicy does when deployed), scored with the same reward as the baselines."""
+    env = SignalEnv(cfg, traffic=traffic)
+    obs, _ = env.reset(seed=0)
+    total, done = 0.0, False
+    while not done:
+        action, _ = model.predict(obs, deterministic=True, action_masks=env.action_masks())
+        obs, r, _, done, info = env.step(int(action))
+        total += r
+    return {"return": total, "waiting_veh_s": info["episode_waiting_veh_s"], "switches": info["episode_switches"]}
+
+
 GAP_OUT_MAX_GREEN = 60.0
 
 
@@ -156,3 +169,22 @@ def gap_out_return(cfg: Config, traffic: dict) -> dict:
         obs, r, _, done, info = env.step(SWITCH if switch else KEEP)
         total += r
     return {"return": total, "waiting_veh_s": info["episode_waiting_veh_s"], "switches": info["episode_switches"]}
+
+
+class GapOutPolicy:
+    """The same gap-out rule as ``gap_out_return``, as a SignalPolicy, so ``rl.evaluate`` can run
+    it on a plain Simulation with the full metrics (delay, pedestrians). Same decision grid, same
+    "queue_green" input, same 60 s cap; parity with the env version is tested."""
+
+    name = "gap_out"
+
+    def __init__(self, decision_interval_s: float, max_green_s: float = GAP_OUT_MAX_GREEN):
+        self.clock = DecisionClock(decision_interval_s)
+        self.max_green_s = max_green_s
+
+    def update(self, controller, sim) -> None:
+        if not self.clock.due(sim) or not controller.can_switch():
+            return
+        obs = observe(sim)
+        if obs[0] <= 0.0 or controller.time_in_stage >= self.max_green_s:  # obs[0] = queue_green
+            controller.request_switch()

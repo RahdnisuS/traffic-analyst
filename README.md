@@ -12,7 +12,7 @@ Work in progress. The full README (architecture diagram, results, learnings) com
 - [x] Phase 5: 2.5D Three.js view (orthographic tilted camera, low-poly instanced vehicles, capsule
       pedestrians, procedural buildings, glowing signals, soft shadows) with a toggle back to the 2D view
 - [x] Phase 6: stress test and capacity benchmark (`python -m bench`) plus a live stress test in the dashboard
-- [~] Phase 7: RL signal controller (Gymnasium env + MaskablePPO), code and tests done; model not trained yet
+- [x] Phase 7: RL signal controller (Gymnasium env + MaskablePPO), beats the fixed timer by 11–26% and a gap-out rule by 5–7%
 
 ## Quick start
 ```bash
@@ -59,13 +59,27 @@ controller, so a badly trained agent can be slow but never unsafe. Every decisio
 (what it saw, what it chose, how confident it was) to `decisions.jsonl` in the run log, so the
 analyst can later explain why it switched.
 
-**Status: code and tests done, model not trained yet.** Train and evaluate it with:
+Train and evaluate it with:
 
 ```bash
-python -m rl.train      # ~20 min on 14 cores -> rl/models/ppo_signal.zip + training curve
-python -m rl.evaluate   # vs the fixed timer on held-out seeds at low/medium/high demand
+python -m rl.train      # ~18 min on 14 cores -> rl/models/ppo_signal.zip + training curve
+python -m rl.evaluate   # vs the fixed timer and gap-out on held-out seeds at low/medium/high demand
 ```
 
 The training curve is drawn against two baselines on the same traffic: the fixed timer and a
-simple "gap-out" rule (switch once the green's queue has cleared, ~15% better than the fixed
-timer). An interrupted run had already passed the fixed timer at 111k of 300k decisions.
+simple "gap-out" rule (switch once the green's queue has cleared). It shows the agent twice: while
+training (sampling actions to explore) and with its best action every 25k decisions, which is how
+it runs when deployed. The best-action agent passes gap-out after ~50k decisions.
+
+![Training curve](experiments/results/rl/20261108-185428/training_curve.png)
+
+Held-out seeds 101–105, 15 minutes each, total vehicle waiting (fixed / gap-out / RL):
+
+| Demand per approach | Fixed timer | Gap-out | RL agent | RL vs fixed | RL vs gap-out |
+|---|---|---|---|---|---|
+| 250 veh/h | 2.94 veh·h | 2.33 | **2.17** | −26% | −7% |
+| 400 veh/h | 5.10 | 4.58 | **4.35** | −15% | −5% |
+| 500 veh/h | 8.21 | 7.83 | **7.31** | −11% | −7% |
+
+Trade-off: the reward only counts vehicles, so pedestrians wait longer than under gap-out
+(e.g. 56 s vs 49 s at 500 veh/h), though still less than under the fixed timer (62 s).

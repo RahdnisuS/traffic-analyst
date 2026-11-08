@@ -174,7 +174,8 @@ rl:
   demand_imbalance: 0.3   # each approach x U(0.7, 1.3): uneven demand is where adaptive signals win
   ped_rate_ph: [0, 500]
   n_envs: 14              # parallel simulations, one process each (16-core machine: 2 left for PPO + OS)
-  total_timesteps: 300000 # decisions; ~30-40 min on 14 cores (one env does ~22 decisions/s)
+  total_timesteps: 300000 # decisions; ~16 min on 14 cores (one env does ~22 decisions/s)
+  curve_eval_every: 25000 # decisions between greedy evaluations for the training curve (~15 s each)
   seed: 0
   eval_seeds: [101, 102, 103, 104, 105]   # never used in training
   eval_demand_vph: {low: 250, medium: 400, high: 500}
