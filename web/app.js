@@ -7,6 +7,12 @@ import { Charts } from "./charts.js";
 
 const $ = (id) => document.getElementById(id);
 const frames = new FrameBuffer();
+// Comparison mode: the AI twin streams its own frames and gets its own pair of renderers, created
+// on first use. Both panes share ONE camera (see syncCameras) so they can be compared spot for spot.
+const twinFrames = new FrameBuffer();
+const twinViews = { "2d": null, "3d": null };
+let Renderer3DClass = null;
+let camLeader = "main"; // the pane the user last panned/zoomed: the other one copies its camera
 // Two interchangeable views fed by the same interpolated frames. Only the visible one draws,
 // so the hidden view costs nothing. The 3D view loads lazily (see load3D).
 const views = { "2d": new Renderer2D($("view2d")), "3d": null };
@@ -14,7 +20,9 @@ let mode = "2d";
 let layoutArgs = null; // last init's layout, replayed into the 3D view if it loads later
 const active = () => views[mode];
 const charts = new Charts($("ch-queue"), $("ch-delay"));
-const state = { limits: null, playing: false, speed: 1, ws: null, retry: 0, types: [] };
+const state = { limits: null, playing: false, speed: 1, ws: null, retry: 0, types: [],
+  controller: "fixed", aiAvailable: false, comparing: false, seed: null };
+const CONTROLLER_NAMES = { fixed: "fixed timer", rl: "AI" };
 const MAX_EVENTS = 80;
 const TYPE_NAMES = { car: "Cars", bike: "Bikes", auto: "Autos", bus: "Buses" };
 
@@ -49,12 +57,14 @@ function handle(msg) {
     case "init":
       state.limits = msg.limits;
       layoutArgs = [msg.layout, msg.vehicle_types.map((t) => msg.vehicle_dims[t]), msg.vehicle_types, msg.ped_radius];
-      for (const v of Object.values(views)) v?.setLayout(...layoutArgs);
+      for (const v of [...Object.values(views), ...Object.values(twinViews)]) v?.setLayout(...layoutArgs);
       buildMix(msg.vehicle_types);
       frames.clear();
-      charts.reset(msg.history);
+      twinFrames.clear();
+      charts.reset(msg.history, msg.twin_history);
       $("events").innerHTML = "";
-      addEvents(msg.events);
+      addEvents(msg.events, msg.twin_events ? "Fixed" : null);
+      if (msg.twin_events) addEvents(msg.twin_events, "AI");
       buildSpeeds(msg.limits.speeds);
       showBenchmark(msg.benchmark);
       configureSliders(msg.limits);
@@ -63,26 +73,37 @@ function handle(msg) {
       break;
     case "frame":
       frames.push(msg, performance.now());
+      if (msg.twin) {
+        twinFrames.push(msg.twin, performance.now());
+        $("twin-phase").textContent = phaseText(msg.twin);
+      }
       updateStressProgress(msg.t);
       $("hud-clock").textContent = clock(msg.t);
-      $("hud-phase").textContent = msg.phase === "PED"
-        ? `Pedestrian phase · ${{ walk: "walk", ped_clear: "finish crossing", all_red: "all-red" }[msg.stage] ?? msg.stage}`
-        : `Phase ${msg.phase} · ${msg.stage.replace("_", "-")}`;
+      $("hud-phase").textContent = phaseText(msg);
       break;
     case "metrics":
-      charts.addRows(msg.rows);
-      updateKpis(msg.rows.at(-1));
+      charts.addRows(msg.rows, msg.twin_rows);
+      if (msg.rows.length) updateKpis(msg.rows.at(-1));
+      if (msg.compare) showCompare(msg.compare);
       break;
     case "events":
-      addEvents(msg.events.filter((e) => e.type !== "phase_change"));
+      addEvents(msg.events.filter((e) => e.type !== "phase_change"), msg.twin_events ? "Fixed" : null);
+      if (msg.twin_events) addEvents(msg.twin_events.filter((e) => e.type !== "phase_change"), "AI");
       break;
     case "status":
       applyStatus(msg);
       break;
     case "error":
+      setSwitchBusy(false);
       toast(msg.message);
       break;
   }
+}
+
+function phaseText(f) {
+  return f.phase === "PED"
+    ? `Pedestrian phase · ${{ walk: "walk", ped_clear: "finish crossing", all_red: "all-red" }[f.stage] ?? f.stage}`
+    : `Phase ${f.phase} · ${f.stage.replace("_", "-")}`;
 }
 
 function applyStatus(s) {
@@ -104,7 +125,147 @@ function applyStatus(s) {
   }
   updateMixLabels();
   applyStress(s.stress);
+  applyAi(s);
   if (s.error) toast(s.error);
+}
+
+// ------------------------------------------------------------------ AI control & comparison
+// The switch keeps one accessible name ("AI signal control"); loading is said in the note below it.
+function setSwitchBusy(busy) {
+  $("ai-switch").setAttribute("aria-busy", String(busy));
+  if (busy) $("ai-note").textContent = "Loading the AI model… (a few seconds, first time only)";
+}
+
+function applyAi(s) {
+  state.controller = s.controller ?? "fixed";
+  state.aiAvailable = !!s.ai_available;
+  state.seed = s.seed;
+  setSwitchBusy(false);
+  const comparing = !!s.compare;
+  const stressing = !!s.stress?.active;
+  const sw = $("ai-switch");
+  sw.setAttribute("aria-checked", String(state.controller === "rl"));
+  sw.disabled = !state.aiAvailable || comparing;
+  // One place to stop a comparison (the Keep buttons in its panel); here it just says it's running.
+  const cmp = $("btn-compare");
+  cmp.disabled = !state.aiAvailable || stressing || comparing;
+  cmp.textContent = comparing ? "Comparing…" : "Compare side by side";
+  // The comparison and the stress test exclude each other (the server refuses both ways).
+  $("btn-stress").disabled = comparing;
+  const tag = $("hud-ctrl");
+  const aiDrives = !comparing && state.controller === "rl";
+  tag.textContent = aiDrives ? "AI" : "Fixed timer";
+  tag.classList.toggle("ai", aiDrives);
+
+  const note = $("ai-note");
+  if (!state.aiAvailable) note.innerHTML = "No trained AI yet. Run <code>python -m rl.train</code>, then restart.";
+  else if (comparing) note.textContent = "Both controllers are running on the same traffic.";
+  else if (aiDrives) note.textContent = "The AI decides when each green ends, checking every 5 s. The green-time slider applies to the fixed timer.";
+  else note.textContent = "";
+  setComparing(comparing);
+  if (comparing) showCompare(s.compare);
+}
+
+function setComparing(on) {
+  if (on === state.comparing) return;
+  state.comparing = on;
+  if (on) ensureTwinViews();
+  $("stage").classList.toggle("comparing", on);
+  $("view-twin").hidden = !on;
+  $("compare").hidden = !on;
+  $("kpis").hidden = on; // the comparison panel carries the numbers while it runs
+  $("ch-queue-title").textContent = on ? "Queued vehicles, all approaches" : "Queued vehicles by approach";
+  if (!on) {
+    twinFrames.clear();
+    state.verdict = null;
+    // The Keep button that was just pressed has disappeared with its panel: don't strand focus.
+    if (state.refocus) $("btn-compare").focus();
+  }
+  state.refocus = false;
+  camLeader = "main";
+}
+
+function ensureTwinViews() {
+  if (!twinViews["2d"]) {
+    twinViews["2d"] = new Renderer2D($("twin2d"));
+    bindLeader($("twin2d"), "twin");
+  }
+  if (Renderer3DClass && !twinViews["3d"]) {
+    twinViews["3d"] = new Renderer3DClass($("twin3d"));
+    bindLeader($("twin3d"), "twin");
+  }
+  for (const v of Object.values(twinViews)) if (v && layoutArgs && !v.layout) v.setLayout(...layoutArgs);
+  $("twin3d").hidden = mode !== "3d";
+  $("twin2d").hidden = mode !== "2d";
+}
+
+/** Whichever pane the user touches leads; the other copies its camera every frame. */
+function bindLeader(canvas, who) {
+  for (const ev of ["pointerdown", "wheel"]) {
+    canvas.addEventListener(ev, () => { camLeader = who; }, { capture: true, passive: true });
+  }
+}
+
+function syncCameras(main, twin) {
+  const [src, dst] = camLeader === "main" ? [main, twin] : [twin, main];
+  dst.zoom = src.zoom;
+  if (src.pan) dst.pan = { ...src.pan };                       // 2D
+  if (src.target) {                                            // 3D
+    dst.target = { ...src.target };
+    dst.azimuth = src.azimuth;
+    dst.spin = src.spin ? { ...src.spin } : null;
+  }
+}
+
+const WARMUP_S = 60;
+const pct = (v) => `${Math.abs(v).toFixed(0)}%`;
+
+/** Lower is better for every compared measure. Within 1 % counts as "about the same". */
+function verdict(change) {
+  if (change == null) return null;
+  if (Math.abs(change) < 1) return "same";
+  return change < 0 ? "better" : "worse";
+}
+
+/** "5% less" / "3% more" / "about the same": the change said in words, never a bare signed number. */
+function inWords(change, more = "more", less = "less") {
+  const v = verdict(change);
+  return v === "same" ? "about the same" : `${pct(change)} ${v === "better" ? less : more}`;
+}
+
+// Every pair reads in pane order: fixed timer first, then the AI.
+function showCompare(c) {
+  if (!c) return;
+  $("cmp-seed").textContent = state.seed ?? "–";
+  const f = c.fixed, a = c.rl, ch = c.change_pct;
+  const ready = c.t >= WARMUP_S && ch.waiting != null; // the first minute is mostly empty road: noise
+  const vmin = (s) => `${Math.round(s / 60).toLocaleString()} veh·min`;
+  const hero = $("cmp-hero");
+  const v = ready ? verdict(ch.waiting) : null;
+  hero.dataset.verdict = v ?? "";
+  if (ready) {
+    hero.textContent = v === "same" ? "About the same waiting" : `${inWords(ch.waiting)} waiting`;
+    $("cmp-hero-label").textContent = "with the AI than with the fixed timer, counting every vehicle-second of waiting";
+    $("cmp-hero-sub").textContent = `Fixed timer ${vmin(f.waiting_veh_s)} → AI ${vmin(a.waiting_veh_s)} since 0:00`;
+  } else {
+    hero.textContent = "Measuring…";
+    $("cmp-hero-label").textContent = "Total time vehicles spend waiting, fixed timer vs AI";
+    $("cmp-hero-sub").textContent = `Results appear after ${clock(WARMUP_S)} of simulated time.`;
+  }
+  // Screen readers hear the verdict once when it appears and again only when it changes,
+  // not every second (the numbers update at 1 Hz).
+  if (v && v !== state.verdict) {
+    $("cmp-announce").textContent = `Comparison: ${hero.textContent} with the AI than with the fixed timer.`;
+  }
+  state.verdict = v;
+  const tile = (id, fixed, ai, change) => {
+    $(id).textContent = fixed == null || ai == null ? "–" : `${fixed.toFixed(1)} → ${ai.toFixed(1)} s`;
+    $(`${id}-sub`).textContent = fixed == null || ai == null ? "fixed timer → AI"
+      : ready && change != null ? `fixed timer → AI · ${inWords(change, "longer", "shorter")}` : "fixed timer → AI";
+  };
+  tile("cmp-delay", f.mean_delay_s, a.mean_delay_s, ch.delay);
+  tile("cmp-ped", f.mean_ped_wait_s, a.mean_ped_wait_s, ch.ped_wait);
+  $("cmp-now").textContent = `${f.waiting_now} → ${a.waiting_now}`;
 }
 
 // ------------------------------------------------------------------ capacity / stress test
@@ -232,6 +393,8 @@ function describe(e) {
       return e.capacity_vph == null ? `Stress test ${e.reason}: no step kept up`
         : `Stress test ${e.reason === "stopped" ? "stopped" : "finished"}: kept up to ${fmt(e.capacity_level_vph)} ` +
           `veh/h per approach` + (e.overloaded_level_vph != null ? `, overloaded at ${fmt(e.overloaded_level_vph)}` : "");
+    case "controller_change":
+      return `Signal control: ${CONTROLLER_NAMES[e.from] ?? e.from} → ${CONTROLLER_NAMES[e.to] ?? e.to}`;
     case "los_change":
       return `Level of Service ${e.from ?? "–"} → ${e.to} (delay ${e.mean_delay_window} s)`;
     case "config_change": {
@@ -249,7 +412,8 @@ function describe(e) {
   }
 }
 
-function addEvents(list) {
+/** `side` labels events in comparison mode ("Fixed" / "AI"); null outside it. */
+function addEvents(list, side = null) {
   const ol = $("events");
   for (const e of list) {
     // The ramp's own volume changes are logged, but the stress-step lines already say it here.
@@ -259,7 +423,14 @@ function addEvents(list) {
     time.textContent = e.clock;
     const span = document.createElement("span");
     span.textContent = describe(e); // textContent, never innerHTML: no injection from data
-    li.append(time, span);
+    li.append(time);
+    if (side) {
+      const tag = document.createElement("b");
+      tag.className = `side-tag${side === "AI" ? " ai" : ""}`;
+      tag.textContent = side;
+      li.append(tag);
+    }
+    li.append(span);
     ol.prepend(li);
   }
   while (ol.children.length > MAX_EVENTS) ol.lastChild.remove();
@@ -356,16 +527,30 @@ for (const [id, key] of [["sl-volume", "volume_vph"], ["sl-aggr", "aggressivenes
 }
 
 $("btn-play").onclick = () => send({ cmd: state.playing ? "pause" : "play" });
+$("ai-switch").onclick = () => {
+  const want = state.controller === "rl" ? "fixed" : "rl";
+  if (want === "rl") setSwitchBusy(true); // the first switch loads the network (a few seconds)
+  send({ cmd: "controller", value: want });
+};
+$("btn-compare").onclick = () => send({ cmd: "compare", action: "start" });
+for (const id of ["btn-keep-fixed", "btn-keep-rl"]) {
+  $(id).onclick = (e) => {
+    state.refocus = true;
+    send({ cmd: "compare", action: "stop", keep: e.currentTarget.dataset.keep });
+  };
+}
 $("btn-stress").onclick = () => send({ cmd: "stress", action: state.stress?.active ? "stop" : "start" });
 $("btn-reset").onclick = () => {
   const seed = Number.parseInt($("seed").value, 10);
   send({ cmd: "reset", seed: Number.isFinite(seed) && seed >= 0 ? seed : null });
 };
-$("zoom-in").onclick = () => active().zoomBy(1.4);
-$("zoom-out").onclick = () => active().zoomBy(1 / 1.4);
-$("zoom-fit").onclick = () => active().fit();
-$("rot-l").onclick = () => views["3d"]?.rotate(-Math.PI / 2);
-$("rot-r").onclick = () => views["3d"]?.rotate(Math.PI / 2);
+// The view tools act on the left pane, which then leads the shared camera.
+const lead = (fn) => () => { camLeader = "main"; fn(); };
+$("zoom-in").onclick = lead(() => active().zoomBy(1.4));
+$("zoom-out").onclick = lead(() => active().zoomBy(1 / 1.4));
+$("zoom-fit").onclick = lead(() => active().fit());
+$("rot-l").onclick = lead(() => views["3d"]?.rotate(-Math.PI / 2));
+$("rot-r").onclick = lead(() => views["3d"]?.rotate(Math.PI / 2));
 $("mode-2d").onclick = () => setMode("2d");
 $("mode-3d").onclick = () => setMode("3d");
 document.addEventListener("keydown", (e) => {
@@ -374,7 +559,12 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     send({ cmd: state.playing ? "pause" : "play" });
   } else if (mode === "3d" && (e.code === "KeyQ" || e.code === "KeyE")) {
+    camLeader = "main";
     views["3d"].rotate(e.code === "KeyQ" ? -Math.PI / 2 : Math.PI / 2);
+  } else if (e.code === "KeyA" && !$("ai-switch").disabled) {
+    $("ai-switch").click(); // A: AI on/off
+  } else if (e.code === "KeyC" && !state.comparing && !$("btn-compare").disabled) {
+    $("btn-compare").click(); // C: start a comparison (stopping means choosing a side: use the buttons)
   } else if (e.code === "KeyF") {
     $("hud-fps").hidden = !$("hud-fps").hidden; // frame-rate readout, for checking performance
   }
@@ -392,6 +582,9 @@ function setMode(m) {
   mode = m;
   $("view3d").hidden = m !== "3d";
   $("view2d").hidden = m !== "2d";
+  $("twin3d").hidden = m !== "3d";
+  $("twin2d").hidden = m !== "2d";
+  if (m === "3d" && state.comparing) ensureTwinViews();
   $("legend-3d").hidden = m !== "3d";
   $("legend-2d").hidden = m !== "2d";
   for (const b of document.querySelectorAll(".only-3d")) b.hidden = m !== "3d";
@@ -407,7 +600,9 @@ function setMode(m) {
 async function load3D() {
   try {
     const { Renderer3D } = await import("./render3d.js");
+    Renderer3DClass = Renderer3D;
     views["3d"] = new Renderer3D($("view3d"));
+    bindLeader($("view3d"), "main");
     if (layoutArgs) views["3d"].setLayout(...layoutArgs);
     $("mode-3d").disabled = false;
     // 3D is the default; 2D is the debug view. ?view=2d|3d in the URL overrides the remembered choice.
@@ -434,7 +629,10 @@ function clock(t) { const s = Math.max(0, Math.floor(t)); return `${Math.floor(s
 // ------------------------------------------------------------------ render loop
 const fps = { last: 0, avg: 60, shown: 0 };
 function loop(now) {
+  const twin = state.comparing ? twinViews[mode] : null;
+  if (twin) syncCameras(active(), twin);
   active().draw(frames.cur, frames.sample(now), frames.samplePeds(now), now);
+  if (twin && twinFrames.cur) twin.draw(twinFrames.cur, twinFrames.sample(now), twinFrames.samplePeds(now), now);
   if (fps.last) fps.avg = 0.95 * fps.avg + 0.05 * (1000 / Math.max(now - fps.last, 1));
   fps.last = now;
   if (!$("hud-fps").hidden && now - fps.shown > 500) {
@@ -444,6 +642,7 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
+bindLeader($("view2d"), "main");
 addEvents([]);
 connect();
 load3D();

@@ -13,6 +13,7 @@ Work in progress. The full README (architecture diagram, results, learnings) com
       pedestrians, procedural buildings, glowing signals, soft shadows) with a toggle back to the 2D view
 - [x] Phase 6: stress test and capacity benchmark (`python -m bench`) plus a live stress test in the dashboard
 - [x] Phase 7: RL signal controller (Gymnasium env + MaskablePPO), beats the fixed timer by 11–26% and a gap-out rule by 5–7%
+- [x] Phase 8: AI in the dashboard: an AI on/off switch and a live side-by-side comparison with the fixed timer
 
 ## Quick start
 ```bash
@@ -35,6 +36,26 @@ signal timing live. The junction opens in the **3D** view (drag to pan, wheel to
 rotate, **Fit** to reset); **2D** switches to the top-down debug view. Add `?view=2d` to the URL to
 start in 2D, and press **F** for a frame-rate readout. If WebGL or the CDN is unavailable, the
 dashboard stays in 2D.
+
+### AI in the dashboard
+- **AI signal control** (switch, or press **A**) hands the running junction to the trained agent,
+  and back, without restarting: the new controller takes over from the current state. The swap is
+  logged as a `controller_change` event. Needs a trained model (`python -m rl.train`).
+- **Compare side by side** (or **C**) restarts two junctions from empty at 0:00 with the same seed
+  and settings, the fixed timer on the left and the AI on the right. They run in lockstep, every
+  slider change reaches both at the same simulated instant, and both panes share one camera. The
+  panel underneath says the result in words ("5% less waiting with the AI"), measured as
+  `rl.evaluate` does, after a one-minute warm-up; differences under 1% count as "about the same".
+  **Keep fixed timer** / **Keep AI** ends the comparison and keeps that junction running.
+
+Why the comparison is fair: every random draw (arrivals, vehicle types, pedestrians) happens on
+every step regardless of the signals, so both junctions see exactly the same traffic. A test runs
+both and checks that their random generators end in a bit-identical state. Each side is logged as
+its own run, tagged with a shared `compare_id`.
+
+Live numbers swing early: a run that starts from an empty junction can show the AI behind for the
+first few minutes before it settles near its held-out average (5–7% less waiting than gap-out,
+11–26% less than the fixed timer; see below). One seed in the dashboard is a demo, not a result.
 
 ## Capacity benchmark
 How much traffic can the junction handle? `python -m bench` steps demand up (+50 veh/h per approach

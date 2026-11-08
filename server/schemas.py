@@ -56,6 +56,21 @@ class StressCmd(_Cmd):
     action: Literal["start", "stop"]
 
 
-Command = Annotated[Union[PlayCmd, PauseCmd, SpeedCmd, ResetCmd, SettingsCmd, StressCmd],
+class ControllerCmd(_Cmd):
+    """AI on/off: which policy drives the live run. Takes over from the current state."""
+    cmd: Literal["controller"]
+    value: Literal["fixed", "rl"]
+
+
+class CompareCmd(_Cmd):
+    """Start or stop the side-by-side comparison (fixed timer vs AI on the same seed)."""
+    cmd: Literal["compare"]
+    action: Literal["start", "stop"]
+    # On stop: which side keeps running ("fixed" | "rl"). None keeps the side the AI switch was on.
+    keep: Literal["fixed", "rl"] | None = None
+
+
+Command = Annotated[Union[PlayCmd, PauseCmd, SpeedCmd, ResetCmd, SettingsCmd, StressCmd, ControllerCmd,
+                          CompareCmd],
                     Field(discriminator="cmd")]
 command_adapter: TypeAdapter = TypeAdapter(Command)

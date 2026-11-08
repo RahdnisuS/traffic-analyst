@@ -20,10 +20,12 @@
   </header>
 
   <main class="layout">
+    <div id="stage" class="stage">
     <section id="view" class="view card" aria-label="Junction view">
       <canvas id="view3d" aria-label="2.5D junction simulation" hidden></canvas>
       <canvas id="view2d" aria-label="Top-down junction simulation"></canvas>
       <div class="hud" aria-live="off">
+        <span id="hud-ctrl" class="pane-tag">Fixed timer</span>
         <span id="hud-clock" class="hud-clock">0:00</span>
         <span id="hud-phase" class="hud-phase">–</span>
         <span id="hud-fps" class="hud-fps" hidden></span>
@@ -53,6 +55,47 @@
       </ul>
     </section>
 
+    <!-- Comparison mode: the AI twin, same seed and traffic as the left pane. Both panes share one
+         camera (pan/zoom either one), so the two junctions can be compared spot for spot. -->
+    <section id="view-twin" class="view card twin" aria-label="Junction view, AI controller" hidden>
+      <canvas id="twin3d" aria-label="2.5D junction simulation, AI controller" hidden></canvas>
+      <canvas id="twin2d" aria-label="Top-down junction simulation, AI controller"></canvas>
+      <div class="hud" aria-live="off">
+        <span class="pane-tag ai">AI</span>
+        <span id="twin-phase" class="hud-phase">–</span>
+      </div>
+    </section>
+
+    <section id="compare" class="card compare" aria-label="Fixed timer versus AI" hidden>
+      <div class="compare-head">
+        <h2>Fixed timer vs AI, same traffic</h2>
+        <!-- Stopping is also choosing: which junction keeps running afterwards. -->
+        <div class="keep" role="group" aria-label="Stop the comparison and keep">
+          <button id="btn-keep-fixed" class="btn" data-keep="fixed">Keep fixed timer</button>
+          <button id="btn-keep-rl" class="btn" data-keep="rl">Keep AI</button>
+        </div>
+      </div>
+      <div class="compare-body">
+        <div class="hero">
+          <span id="cmp-hero" class="hero-value">Measuring…</span>
+          <span id="cmp-hero-label" class="hero-label">Total time vehicles spend waiting, fixed timer vs AI</span>
+          <span id="cmp-hero-sub" class="hero-sub"></span>
+        </div>
+        <!-- Every pair reads in pane order, fixed timer first, then the AI. -->
+        <dl class="cmp-tiles">
+          <div class="cmp-tile"><dt>Mean delay per trip</dt><dd id="cmp-delay">–</dd><dd id="cmp-delay-sub" class="tile-sub"></dd></div>
+          <div class="cmp-tile"><dt>Pedestrian wait at the kerb</dt><dd id="cmp-ped">–</dd><dd id="cmp-ped-sub" class="tile-sub"></dd></div>
+          <div class="cmp-tile"><dt>Vehicles waiting now</dt><dd id="cmp-now">–</dd><dd class="tile-sub">fixed timer → AI</dd></div>
+        </dl>
+      </div>
+      <p class="hint">Both junctions started empty at 0:00 with seed <span id="cmp-seed">–</span>. Every arrival is
+        identical on both sides and slider changes reach both at the same moment: only the signal controller differs.
+        Waiting counts every vehicle stopped or queued to enter, every second; it is what the AI was trained to
+        reduce. Differences under 1% count as about the same.</p>
+      <p id="cmp-announce" class="sr-only" aria-live="polite"></p>
+    </section>
+    </div>
+
     <aside class="side">
       <section class="card controls" aria-label="Simulation controls">
         <div class="row">
@@ -60,6 +103,13 @@
           <button id="btn-reset" class="btn">Reset</button>
           <label class="seed">Seed <input id="seed" type="number" min="0" step="1" value="42" inputmode="numeric"></label>
         </div>
+        <div class="row ai-row">
+          <button id="ai-switch" class="switch" role="switch" aria-checked="false" disabled title="Shortcut: A">
+            <span class="track" aria-hidden="true"><i></i></span>AI signal control
+          </button>
+          <button id="btn-compare" class="btn" disabled title="Shortcut: C">Compare side by side</button>
+        </div>
+        <p id="ai-note" class="ai-note" aria-live="polite"></p>
         <div class="row">
           <span class="label" id="speed-label">Speed</span>
           <div id="speeds" class="segmented" role="group" aria-labelledby="speed-label"></div>
@@ -86,7 +136,7 @@
         </fieldset>
       </section>
 
-      <section class="kpis" aria-label="Live metrics">
+      <section id="kpis" class="kpis" aria-label="Live metrics">
         <div class="kpi"><span class="kpi-label">Sim time</span><span id="kpi-clock" class="kpi-value">0:00</span></div>
         <div class="kpi"><span class="kpi-label">Vehicles</span><span id="kpi-veh" class="kpi-value">0</span><span id="kpi-backlog" class="kpi-sub"></span></div>
         <div class="kpi"><span class="kpi-label">Throughput</span><span id="kpi-thru" class="kpi-value">–</span><span class="kpi-sub">veh/h, last 2 min</span></div>
@@ -109,11 +159,11 @@
       </section>
 
       <section class="card chart-card">
-        <h2>Queued vehicles by approach</h2>
+        <h2 id="ch-queue-title">Queued vehicles by approach</h2>
         <div class="chart-box"><canvas id="ch-queue" role="img" aria-label="Line chart of queued vehicles per approach over the last 5 minutes"></canvas></div>
       </section>
       <section class="card chart-card">
-        <h2>Mean control delay, rolling 2 min (s)</h2>
+        <h2 id="ch-delay-title">Mean control delay, rolling 2 min (s)</h2>
         <div class="chart-box"><canvas id="ch-delay" role="img" aria-label="Line chart of mean control delay over the last 5 minutes"></canvas></div>
       </section>
       <section class="card">

@@ -6,11 +6,12 @@
   --surface: #fcfcfb;
   --ink: #0b0b0b;
   --ink-2: #52514e;
-  --muted: #898781;
+  --muted: #6b6a64;      /* >= 4.5:1 on page and surface: muted text is still read (sub-labels, notes) */
   --grid: #e1e0d9;
   --axis: #c3c2b7;
   --border: rgba(11, 11, 11, 0.10);
   --accent: #2a78d6;
+  --accent-fill: #1f63b8; /* accent as a FILL behind white text (5.9:1); --accent itself is for marks */
   /* categorical series: fixed order N, E, S, W (validated palette order) */
   --series-1: #2a78d6;
   --series-2: #eb6834;
@@ -33,6 +34,8 @@
   --ped: #7c3aed;
   --ped-halo: #ffffff;
   --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Motion: one strong ease-out for every UI transition (built-in "ease-out" is too weak). */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -72,9 +75,20 @@ h2 { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--ink-2); }
   grid-template-columns: minmax(0, 1fr) minmax(320px, 380px); align-items: start; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
 
-/* Junction view: square, sticky on desktop so it stays visible while scrolling the sidebar */
-.view { position: sticky; top: 16px; padding: 0; overflow: hidden;
+/* Junction view(s): square, sticky on desktop so they stay visible while scrolling the sidebar.
+   Comparison mode puts the AI twin beside the fixed-timer view, with the results underneath. */
+.stage { position: sticky; top: 16px; display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+.stage.comparing { position: static; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.stage > * { min-width: 0; }
+.view { position: relative; padding: 0; overflow: hidden;
   aspect-ratio: 1 / 1; max-height: calc(100vh - 90px); width: 100%; justify-self: center; }
+.view[hidden], .compare[hidden], .kpis[hidden] { display: none; }
+/* Half-width panes: the view tools drop under the HUD instead of covering the phase label. */
+.stage.comparing .view-tools { top: 46px; }
+/* The twin pane and the results enter (they only ever appear on a click): a short fade and lift
+   so the new pane doesn't just pop in. The layout itself snaps; animating widths would relayout. */
+.view.twin, .compare { transition: opacity 220ms var(--ease-out), transform 220ms var(--ease-out); }
+@starting-style { .view.twin, .compare { opacity: 0; transform: translateY(8px); } }
 .view canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
 .view canvas[hidden] { display: none; }
 .view canvas:active { cursor: grabbing; }
@@ -88,6 +102,9 @@ h2 { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--ink-2); }
 .view-tools button[disabled] { opacity: 0.45; cursor: not-allowed; }
 .view-tools [hidden] { display: none; }
 .hud-fps { font-weight: 500 !important; color: var(--ink-2); }
+/* Who drives this junction. The AI tag is filled so the two panes are told apart at a glance. */
+.hud .pane-tag { font-weight: 650; }
+.hud .pane-tag.ai { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
 .view-legend { position: absolute; bottom: 8px; left: 10px; margin: 0; padding: 4px 8px; list-style: none;
   display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--ink-2);
   background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
@@ -110,10 +127,53 @@ button { font: inherit; color: inherit; }
   border-radius: 6px; padding: 6px 12px; cursor: pointer; min-height: 32px; }
 .icon-btn { min-width: 32px; padding: 4px 8px; }
 .btn:hover, .icon-btn:hover, .segmented button:hover { border-color: var(--axis); }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; min-width: 72px; }
+.btn.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; font-weight: 600; min-width: 72px; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .controls { display: flex; flex-direction: column; gap: 12px; }
+
+/* AI on/off. A real switch (role="switch"): the thumb slides, the track fills with the accent. */
+.ai-row { justify-content: space-between; }
+.switch { display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; padding: 4px 0;
+  min-height: 32px; cursor: pointer; font-weight: 600; }
+.switch .track { position: relative; flex: none; width: 36px; height: 20px; border-radius: 10px; background: var(--muted);
+  transition: background-color 160ms ease; }
+.switch .track i { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: transform 160ms var(--ease-out); }
+.switch[aria-checked="true"] .track { background: var(--accent); }
+.switch[aria-checked="true"] .track i { transform: translateX(16px); }
+.switch[aria-busy="true"] .track { opacity: 0.6; }
+.switch:disabled { opacity: 0.5; cursor: not-allowed; }
+.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ai-note { margin: -4px 0 0; font-size: 12px; color: var(--muted); }
+.ai-note:empty { display: none; }
+.ai-note code { font-size: 11px; background: var(--page); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+
+/* Comparison results: one hero figure (the AI's change in total waiting) + three stat tiles. */
+.compare { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 10px; }
+.compare-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.keep { display: flex; gap: 6px; flex-wrap: wrap; }
+.compare-head h2 { margin: 0; }
+.compare-body { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+.hero { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+/* The headline says the result in words ("5% less waiting"); the status dot is a second channel. */
+.hero-value { font-size: 36px; font-weight: 650; line-height: 1.1; letter-spacing: -0.01em; text-wrap: balance;
+  display: inline-flex; align-items: center; gap: 10px; }
+.hero-value::before { content: ""; flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--grid); }
+.hero-value[data-verdict="better"]::before { background: var(--good); }
+.hero-value[data-verdict="worse"]::before { background: var(--critical); }
+.hero-value[data-verdict="same"]::before { background: var(--muted); }
+.hero-label { font-size: 13px; color: var(--ink-2); }
+.hero-sub { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.cmp-tiles { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.cmp-tile { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.cmp-tile dt { font-size: 12px; color: var(--ink-2); }
+.cmp-tile dd { margin: 2px 0 0; font-size: 18px; font-weight: 650; }
+.cmp-tile dd.tile-sub { font-size: 12px; font-weight: 400; color: var(--ink-2); }
+.compare .hint { margin: 0; font-size: 11px; color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .label { color: var(--ink-2); font-size: 12px; min-width: 44px; }
 .seed { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: 12px; }
@@ -172,7 +232,18 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .layout > * { min-width: 0; }
 @media (max-width: 900px) {
   .layout { grid-template-columns: minmax(0, 1fr); }
-  .view { position: relative; top: 0; max-height: none; }
+  .stage { position: static; }
+  .view { max-height: none; }
+  .compare-body { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .stage.comparing { grid-template-columns: minmax(0, 1fr); }  /* phones: the two junctions stack */
+  .cmp-tiles { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Fewer, gentler: keep the fades and colour changes, drop the movement. */
+  .switch .track i { transition: none; }
+  @starting-style { .view.twin, .compare { transform: none; } }
 }
 @media (max-width: 560px) {
   /* Phones: the controls row would cover the HUD, so it moves under it. */
@@ -183,3 +254,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   .layout { padding: 12px 16px; gap: 12px; }
   .kpi-value { font-size: 19px; }
 }
+
+/* Comparison mode: which run an event came from (words, plus the accent fill for the AI). */
+.side-tag { flex: none; font-size: 11px; font-weight: 650; padding: 0 5px; border-radius: 4px; line-height: 16px;
+  height: 16px; border: 1px solid var(--border); color: var(--ink-2); }
+.side-tag.ai { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }

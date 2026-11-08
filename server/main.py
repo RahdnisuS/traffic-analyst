@@ -45,7 +45,7 @@ def create_app(cfg: Config | None = None, runs_dir: str | Path | None = None,
         session = SimSession(cfg, log_runs=cfg.logging.enabled if log_runs is None else log_runs,
                              runs_dir=runs_path)
         app.state.session = session
-        task = asyncio.create_task(session.run())
+        task = asyncio.create_task(session.run_loop())
         try:
             yield
         finally:
@@ -60,7 +60,7 @@ def create_app(cfg: Config | None = None, runs_dir: str | Path | None = None,
     async def health():
         s: SimSession = app.state.session
         return {"ok": True, "sim_time": round(s.sim.time, 1), "playing": s.playing,
-                "clients": len(s.clients)}
+                "clients": len(s.clients), "controller": s.controller, "comparing": s.twin is not None}
 
     @app.get("/api/layout")
     async def layout():

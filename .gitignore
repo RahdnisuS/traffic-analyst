@@ -9,3 +9,4 @@ chroma/
 rl/models/*.zip
 .claude/
 skills-lock.json
+.impeccable/
