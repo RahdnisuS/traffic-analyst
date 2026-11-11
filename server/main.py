@@ -28,7 +28,8 @@ from sim.config import PROJECT_ROOT, Config, load_config
 from bench.stress import latest_summary
 from sim.logger import list_runs
 
-from .schemas import command_adapter
+from .analyst import AnalystService
+from .schemas import ChatRequest, command_adapter
 from .session import Client, SimSession
 
 log = logging.getLogger("traffic.server")
@@ -45,6 +46,7 @@ def create_app(cfg: Config | None = None, runs_dir: str | Path | None = None,
         session = SimSession(cfg, log_runs=cfg.logging.enabled if log_runs is None else log_runs,
                              runs_dir=runs_path)
         app.state.session = session
+        session.analyst = AnalystService(session)
         task = asyncio.create_task(session.run_loop())
         try:
             yield
@@ -86,6 +88,17 @@ def create_app(cfg: Config | None = None, runs_dir: str | Path | None = None,
         if not b:
             raise HTTPException(404, "no benchmark has been run yet: python -m bench")
         return b
+
+    @app.post("/api/chat")
+    async def chat(req: ChatRequest):
+        """Ask the analyst. Returns {"type": "answer" | "scenario" | "error", ...}; errors come back as
+        a normal reply (shown in the chat), never as a server error page."""
+        s: SimSession = app.state.session
+        return await s.analyst.ask(req.question.strip(), [t.model_dump() for t in req.history])
+
+    @app.get("/api/analyst")
+    async def analyst_status():
+        return app.state.session.analyst.status()
 
     @app.websocket("/ws/sim")
     async def ws_sim(ws: WebSocket):

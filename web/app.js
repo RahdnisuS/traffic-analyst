@@ -4,6 +4,7 @@
 import { Renderer2D } from "./render2d.js";
 import { FrameBuffer } from "./interp.js";
 import { Charts } from "./charts.js";
+import { Chat } from "./chat.js";
 
 const $ = (id) => document.getElementById(id);
 const frames = new FrameBuffer();
@@ -20,6 +21,7 @@ let mode = "2d";
 let layoutArgs = null; // last init's layout, replayed into the 3D view if it loads later
 const active = () => views[mode];
 const charts = new Charts($("ch-queue"), $("ch-delay"));
+const chat = new Chat($("tab-analyst"), { send });
 const state = { limits: null, playing: false, speed: 1, ws: null, retry: 0, types: [],
   controller: "fixed", aiAvailable: false, comparing: false, seed: null };
 const CONTROLLER_NAMES = { fixed: "fixed timer", rl: "AI" };
@@ -56,6 +58,7 @@ function handle(msg) {
   switch (msg.type) {
     case "init":
       state.limits = msg.limits;
+      chat.setStatus(msg.analyst);
       layoutArgs = [msg.layout, msg.vehicle_types.map((t) => msg.vehicle_dims[t]), msg.vehicle_types, msg.ped_radius];
       for (const v of [...Object.values(views), ...Object.values(twinViews)]) v?.setLayout(...layoutArgs);
       buildMix(msg.vehicle_types);
@@ -582,10 +585,45 @@ document.addEventListener("keydown", (e) => {
     $("ai-switch").click(); // A: AI on/off
   } else if (e.code === "KeyC" && !state.comparing && !$("btn-compare").disabled) {
     $("btn-compare").click(); // C: start a comparison (stopping means choosing a side: use the buttons)
+  } else if (e.key === "/") {
+    e.preventDefault(); // /: ask the analyst
+    setTab("analyst");
+    chat.focus();
   } else if (e.code === "KeyF") {
     $("hud-fps").hidden = !$("hud-fps").hidden; // frame-rate readout, for checking performance
   }
 });
+
+// ------------------------------------------------------------------ side-panel tabs
+// Dashboard (controls, numbers, charts, events) and Analyst (chat). The junction view stays visible
+// with either. Remembered per browser, like the view mode.
+const TABS = { dash: ["tab-btn-dash", "tab-dash"], analyst: ["tab-btn-analyst", "tab-analyst"] };
+function setTab(name, focus = false) {
+  for (const [key, [btn, panel]] of Object.entries(TABS)) {
+    const on = key === name;
+    $(btn).setAttribute("aria-selected", String(on));
+    $(btn).tabIndex = on ? 0 : -1;
+    $(panel).hidden = !on;
+  }
+  if (focus) $(TABS[name][0]).focus();
+  try { localStorage.setItem("side-tab", name); } catch { /* not essential */ }
+}
+$("tab-btn-dash").onclick = () => setTab("dash");
+$("tab-btn-analyst").onclick = () => setTab("analyst");
+for (const id of ["tab-btn-dash", "tab-btn-analyst"]) {
+  $(id).addEventListener("keydown", (e) => { // arrow keys move between tabs (WAI-ARIA tabs pattern)
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      setTab(id === "tab-btn-dash" ? "analyst" : "dash", true);
+    }
+  });
+}
+{
+  // ?tab=analyst opens the chat directly (a shareable link), else the remembered tab.
+  let initial = new URLSearchParams(location.search).get("tab");
+  if (!TABS[initial]) { try { initial = localStorage.getItem("side-tab"); } catch { initial = null; } }
+  if (initial === "analyst") setTab("analyst");
+}
 
 // ------------------------------------------------------------------ view mode
 const store = {

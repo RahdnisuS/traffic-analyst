@@ -223,6 +223,12 @@ class Retriever:
                     ranks[cid]["rerank"] = r
         return [Hit(cid, self._text(cid), self._meta(cid), score, ranks.get(cid, {})) for cid, score in ranked[:k]]
 
+    def get(self, cid: str) -> tuple[str, dict] | None:
+        """(text, metadata) of one chunk by id, or None."""
+        self._ensure_bm25()
+        i = self.index_of.get(cid)
+        return None if i is None else (self.texts[i], self.metas[i])
+
     def _text(self, cid: str) -> str:
         return self.texts[self.index_of[cid]]
 

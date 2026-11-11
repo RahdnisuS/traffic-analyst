@@ -34,6 +34,7 @@ from sim.metrics import clock
 
 from .chunking import Chunk
 
+RUN_INDEX_VERSION = 2  # bump when the summaries change: every run is re-indexed (part of its fingerprint)
 CONTROLLER_NAMES = {"fixed": "fixed timer", "rl": "RL agent (PPO)", "gap_out": "gap-out rule",
                     "actuated": "actuated control"}
 STAGE_WORDS = {"green": "green", "amber": "amber", "all_red": "all-red", "walk": "WALK", "ped_clear": "flashing DON'T WALK"}
@@ -226,7 +227,10 @@ def window_chunk(run: dict, t0: float, t1: float) -> Chunk | None:
         return None
     arms = sorted(k[len("queue_"):] for k in rows[0] if k.startswith("queue_") and k != "queue_total")
     first, last = rows[0], rows[-1]
-    lines = [f"{run_header(m)}, {_span(t0, t1)}."]
+    # A run still being written (the live run) ends mid-window: the window then ends at its last
+    # logged second, not at the minute mark (measured: "5:00-6:00, stopped at 6:00" at 5:11).
+    t1 = min(t1, _f(last["t"]))
+    lines = [f"{run_header(m)}, {_span(t0, t1)}" + (" (the run so far)." if t1 < t0 + 59.5 else ".")]
     lines.append(f"Signals: {_signal_story(events, t0, t1)}.")
     q = []
     for a in arms:
@@ -289,6 +293,9 @@ def decisions_chunk(run: dict, t0: float, t1: float) -> Chunk | None:
     if not ds:
         return None
     m = run["manifest"]
+    rows = run["rows"]
+    if rows:
+        t1 = min(t1, max(_f(rows[-1]["t"]), _f(ds[-1].get("t"))))  # the live run ends mid-window
     switches = [d for d in ds if d.get("action") == "switch" or d.get("forced")]
     keeps = [d for d in ds if d not in switches]
     lines = [f"{run_header(m)}, RL agent decisions {_span(t0, t1)}: {len(ds)} decisions where a switch was possible, "

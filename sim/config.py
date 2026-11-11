@@ -325,6 +325,19 @@ class RAGSettings(_Strict):
         return self
 
 
+class AnalystSettings(_Strict):
+    """Phase 12: the LLM analyst. See the analyst section of config.yaml."""
+    model: str = "openai/gpt-oss-120b"
+    fallback_model: str | None = "openai/gpt-oss-20b"
+    k_run: int = Field(5, ge=1)
+    k_doc: int = Field(5, ge=1)
+    k_mixed: int = Field(3, ge=1)
+    max_source_words: int = Field(260, ge=50)
+    max_answer_tokens: int = Field(900, ge=100)
+    history_turns: int = Field(3, ge=0)
+    log_path: str = "data/analyst/log.jsonl"
+
+
 class Config(_Strict):
     sim: SimSettings = SimSettings()
     vehicle_types: dict[str, VehicleTypeParams]
@@ -341,6 +354,7 @@ class Config(_Strict):
     actuated: ActuatedSettings = ActuatedSettings()
     experiments: ExperimentSettings = ExperimentSettings()
     rag: RAGSettings = RAGSettings()
+    analyst: AnalystSettings = AnalystSettings()
 
     @model_validator(mode="after")
     def _mix_types_exist(self) -> "Config":

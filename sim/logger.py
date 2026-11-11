@@ -176,6 +176,14 @@ class RunLogger:
         for ev in events:
             self._events_fh.write(json.dumps(ev, separators=(",", ":")) + "\n")
 
+    def flush(self) -> None:
+        """Push buffered rows/events/decisions to disk, so a reader (the analyst indexing the live
+        run) sees the run up to now. The files stay open."""
+        if self.closed:
+            return
+        for fh in (self._metrics_fh, self._events_fh, self._trips_fh, self._peds_fh, self._decisions_fh):
+            fh.flush()
+
     # ------------------------------------------------------------------ lifecycle
     def close(self, status: str = "completed", error: str | None = None) -> dict:
         if self.closed:

@@ -305,3 +305,18 @@ rag:
   rrf_k: 60                       # the standard RRF constant (Cormack et al. 2009): damps the top ranks
   rerank_pool: 30
   top_k: 5
+
+# The analyst (Phase 12, rag/analyst.py): route -> retrieve -> answer with citations -> grounding
+# check. Model: OpenAI's open-weight gpt-oss-120b on Groq (Groq retired its Llama 3 chat models);
+# on a rate limit (free tier: ~8,000 tokens/minute) it retries on gpt-oss-20b. The key is read
+# from GROQ_API_KEY (environment or the gitignored .env), never from this file.
+analyst:
+  model: openai/gpt-oss-120b
+  fallback_model: openai/gpt-oss-20b
+  k_run: 5                # run chunks for a run/decision question (+ run summary + live status)
+  k_doc: 5                # document chunks for a guideline question
+  k_mixed: 3              # each, for a question that needs both
+  max_source_words: 260   # longer chunks are cut: ~3,000 prompt tokens per answer on the free tier
+  max_answer_tokens: 900
+  history_turns: 3        # earlier exchanges sent along, so follow-ups ("and at 4:00?") work
+  log_path: data/analyst/log.jsonl   # every question, its sources and the answer (gitignored)

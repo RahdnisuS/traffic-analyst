@@ -20,6 +20,9 @@ Work in progress. The full README (architecture diagram, results, learnings) com
       a Webster-timed fixed timer (−12%) and gap-out (−7%), and ties with classic actuated control
 - [x] Phase 11: knowledge base for the analyst: traffic-engineering PDFs + run logs in ChromaDB, hybrid search
       (BM25 + vectors, reciprocal rank fusion) with cross-encoder re-ranking and time-aware run search
+- [x] Phase 12: the analyst chat (Analyst tab): explains runs and AI decisions with timestamped citations,
+      answers guideline questions with page citations, turns plain-English scenarios into settings you confirm,
+      says "I don't know", and checks every number in its answers against the sources
 
 ## Quick start
 ```bash
@@ -48,7 +51,7 @@ rotate, **Fit** to reset); **2D** switches to the top-down debug view. Add `?vie
 start in 2D, and press **F** for a frame-rate readout. If WebGL or the CDN is unavailable, the
 dashboard stays in 2D.
 
-Keyboard: **Space** play/pause · **A** AI on/off · **C** compare side by side · **Q/E** rotate (3D) ·
+Keyboard: **Space** play/pause · **A** AI on/off · **C** compare side by side · **/** ask the analyst · **Q/E** rotate (3D) ·
 **F** frame-rate readout.
 
 ### AI in the dashboard
@@ -241,4 +244,29 @@ python -m rag.search "how long should the pedestrian clearance interval be"
 python -m rag.search "why did the AI switch at 1:35?" --run 20261108-140830_rl_s42
 python -m rag.search "PCU values for two-wheelers" --source doc --mode hybrid   # modes: vector, bm25, hybrid, hybrid_rerank
 ```
+
+## The analyst (chat)
+The **Analyst** tab next to the Dashboard tab (or press **/**, or open `/?tab=analyst`) answers questions
+about the junction you are watching. It needs a free Groq API key in `.env` (`GROQ_API_KEY=...`, see
+`.env.example`) and the knowledge base (`python -m rag.build`). The model is OpenAI's open-weight
+**gpt-oss-120b** served by Groq (Groq retired its Llama 3 chat models), with gpt-oss-20b as the fallback
+when the free tier's rate limit (~8,000 tokens a minute, about two questions) is reached.
+
+| You ask | It does |
+|---|---|
+| "What happened in the last minute?" / "Why did the queue on N grow at 3:20?" | Searches the **live run's log** (brought up to date before each question) and answers with timestamped citations: `[2] run … @ 3:00-4:00` |
+| "Why did the AI switch at 1:35?" | Answers from the **logged decision**: what the agent saw per approach, its P(switch), the signal state |
+| "Is a 120 s cycle too long?" | Answers from the **documents** with page citations (FHWA Signal Timing Manual p. 6-28) |
+| "Is the cycle too long here?" | Combines both, including the **measured** cycle of the last 5 minutes (under the AI it isn't the plan's) |
+| "Evening rush, 60% bikes, school crossing" | Proposes **settings** (validated against the slider limits) as a card with its assumptions; nothing changes until you press **Apply** |
+| "What was the buses' average speed?" | "I don't know": the logs don't record speeds by type |
+
+How an answer is made: a short call **routes** the question (run / AI decision / guideline / both / scenario)
+and rewrites follow-ups ("and at 4:00?") into standalone questions; relative times ("the last 3 minutes")
+are turned into m:ss ranges in code. The hybrid search then fetches sources (the live run, or a run the
+question names; documents; a **live status** source with the current settings, measured signal timing and
+queues). The model answers from those numbered sources only. Finally a **grounding check** looks for
+every number of the answer in the sources: if one is missing, the model gets one chance to fix it, and
+anything still unsupported is shown under the answer ("Not found in the sources: …") instead of passing
+as fact. Every exchange is logged to `data/analyst/log.jsonl` (question, sources, answer, check result).
 

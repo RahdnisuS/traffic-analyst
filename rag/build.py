@@ -26,7 +26,7 @@ from sim.config import PROJECT_ROOT, Config, load_config
 import hashlib
 
 from .ingest import INGEST_VERSION, file_sha, find_pdfs, load_sources, pdf_chunks
-from .run_indexer import run_chunks
+from .run_indexer import RUN_INDEX_VERSION, run_chunks
 from .vectorstore import VectorStore
 
 STATE_FILE = "index_state.json"
@@ -34,7 +34,8 @@ RUN_FILES = ("manifest.json", "metrics.csv", "events.jsonl", "decisions.jsonl")
 
 
 def run_fingerprint(run_dir: Path) -> str:
-    parts = []
+    """Size + mtime of each log file, and the summariser's version: either changing re-indexes the run."""
+    parts = [f"v{RUN_INDEX_VERSION}"]
     for name in RUN_FILES:
         p = Path(run_dir) / name
         if p.is_file():

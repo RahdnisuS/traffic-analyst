@@ -237,6 +237,7 @@ class SimSession:
         self.twin: LiveRun | None = None   # comparison mode: the AI run (main run = fixed timer)
         self.compare_id: str | None = None
         self.forecaster = self._load_forecaster()
+        self.analyst = None  # server.analyst.AnalystService, attached by the app (Phase 12)
         if self.controller == "rl":
             # The model loads asynchronously (in a thread) and there is no event loop yet, so the
             # dashboard always starts on the fixed timer; the AI is one click away.
@@ -388,6 +389,7 @@ class SimSession:
             "ped_radius": self.sim.cfg.pedestrians.radius,
             "benchmark": self.benchmark_brief(),
             "predictor": self.forecaster.brief() if self.forecaster else None,
+            "analyst": self.analyst.status() if self.analyst else None,
             "forecast_history": list(self.run.forecasts) if self.run.forecaster else [],
             "history": list(self.run.collector.history)[-HISTORY_ON_CONNECT:],
             "twin_history": list(self.twin.collector.history)[-HISTORY_ON_CONNECT:] if self.twin else None,

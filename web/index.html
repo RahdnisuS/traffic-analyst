@@ -97,6 +97,37 @@
     </div>
 
     <aside class="side">
+      <div class="tabs" role="tablist" aria-label="Side panel">
+        <button id="tab-btn-dash" class="tab" role="tab" aria-selected="true" aria-controls="tab-dash">Dashboard</button>
+        <button id="tab-btn-analyst" class="tab" role="tab" aria-selected="false" aria-controls="tab-analyst"
+                title="Shortcut: /">Analyst</button>
+      </div>
+
+      <div id="tab-analyst" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-analyst" hidden>
+        <section class="card analyst" aria-label="Traffic analyst chat">
+          <div class="analyst-head">
+            <h2>Ask the analyst</h2>
+            <span id="analyst-model" class="analyst-model"></span>
+          </div>
+          <p id="analyst-note" class="hint analyst-note">Answers come from this run's log and the traffic-engineering
+            documents, with citations. Every number is checked against the sources.</p>
+          <ol id="chat-log" class="chat-log" aria-live="polite" aria-label="Conversation"></ol>
+          <div id="chat-suggest" class="chat-suggest" aria-label="Example questions">
+            <button class="chip" type="button">What happened in the last minute?</button>
+            <button class="chip" type="button">Why did the AI switch most recently?</button>
+            <button class="chip" type="button">Is the cycle too long here?</button>
+            <button class="chip" type="button">Evening rush, 60% bikes, school crossing</button>
+          </div>
+          <form id="chat-form" class="chat-form" autocomplete="off">
+            <label for="chat-input" class="visually-hidden">Question for the analyst</label>
+            <textarea id="chat-input" rows="2" maxlength="1000"
+                      placeholder="Ask about this run, the guidelines, or describe a scenario…"></textarea>
+            <button id="chat-send" class="btn primary" type="submit">Ask</button>
+          </form>
+        </section>
+      </div>
+
+      <div id="tab-dash" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-dash">
       <section class="card controls" aria-label="Simulation controls">
         <div class="row">
           <button id="btn-play" class="btn primary" aria-pressed="false">Play</button>
@@ -171,6 +202,7 @@
         <h2>Events</h2>
         <ol id="events" class="events" aria-live="polite"></ol>
       </section>
+      </div>
     </aside>
   </main>
   <div id="toast" class="toast" role="alert" hidden></div>

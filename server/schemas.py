@@ -70,6 +70,19 @@ class CompareCmd(_Cmd):
     keep: Literal["fixed", "rl"] | None = None
 
 
+class ChatTurn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    role: Literal["user", "assistant"]
+    content: str = Field(..., max_length=4000)
+
+
+class ChatRequest(BaseModel):
+    """POST /api/chat. History is kept by the browser (chat is per user; the sim is shared)."""
+    model_config = ConfigDict(extra="forbid")
+    question: str = Field(..., min_length=1, max_length=1000)
+    history: list[ChatTurn] = Field(default_factory=list, max_length=12)
+
+
 Command = Annotated[Union[PlayCmd, PauseCmd, SpeedCmd, ResetCmd, SettingsCmd, StressCmd, ControllerCmd,
                           CompareCmd],
                     Field(discriminator="cmd")]
