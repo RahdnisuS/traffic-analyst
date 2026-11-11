@@ -10,3 +10,7 @@ rl/models/*.zip
 .claude/
 skills-lock.json
 .impeccable/
+
+# Phase 9: generated predictor dataset and trained model
+data/predictor_runs/
+predict/models/

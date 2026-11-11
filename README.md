@@ -14,6 +14,8 @@ Work in progress. The full README (architecture diagram, results, learnings) com
 - [x] Phase 6: stress test and capacity benchmark (`python -m bench`) plus a live stress test in the dashboard
 - [x] Phase 7: RL signal controller (Gymnasium env + MaskablePPO), beats the fixed timer by 11–26% and a gap-out rule by 5–7%
 - [x] Phase 8: AI in the dashboard: an AI on/off switch and a live side-by-side comparison with the fixed timer
+- [x] Phase 9: LightGBM congestion predictor: each approach's queue 2 minutes ahead, 37% lower error than
+      "same as now", drawn as dashed lines running ahead of the live queue chart
 
 ## Quick start
 ```bash
@@ -27,6 +29,8 @@ python -m bench               # capacity benchmark (~70 s); results in experimen
 python -m rl.train            # train the RL signal controller (~18 min on 14 cores)
 python -m rl.evaluate         # compare it with the fixed timer and a gap-out rule on held-out seeds
 python -m sim --controller rl # headless run with the trained agent
+python -m predict.generate    # log 150 varied runs for the queue predictor (~90 s on 14 cores)
+python -m predict.train_predictor  # train LightGBM on them (~15 s); the dashboard picks it up
 pytest -q
 ```
 
@@ -107,3 +111,44 @@ Held-out seeds 101–105, 15 minutes each, total vehicle waiting (fixed / gap-ou
 
 Trade-off: the reward only counts vehicles, so pedestrians wait longer than under gap-out
 (e.g. 56 s vs 49 s at 500 veh/h), though still less than under the fixed timer (62 s).
+
+## Congestion predictor
+A LightGBM model forecasts how many vehicles will be queued on each approach **2 minutes from now**.
+The dashboard draws the forecast as a dashed line in each approach's colour, running 2 minutes past
+"now" on the queue chart; as time passes the solid line catches up, so you can see how good each
+forecast was. (Hidden during a side-by-side comparison, whose charts show totals for two controllers.)
+
+```bash
+python -m predict.generate         # 150 logged runs, 20 min each, random traffic and controller
+python -m predict.train_predictor  # -> predict/models/queue_lgbm.txt + a report in experiments/results/predict/
+```
+
+- **Data**: real run logs. The generator logs runs with the normal run logger into
+  `data/predictor_runs/`, each with random demand, imbalance, pedestrians, green time, driver
+  behaviour and vehicle mix, driven in turn by the fixed timer, the gap-out rule or the RL agent
+  (the queue in 2 minutes depends on *who* changes the lights).
+- **Features** (one sample = one approach at one second, one model for all approaches): this
+  approach's queue now and 10–120 s ago, its backlog and arrivals, where it is in the signal cycle
+  (phases until its green, seconds since its last green), the rest of the junction, and the
+  current settings (demand, green time, pedestrian rate, controller). `predict/features.py` is used
+  by both training and the dashboard, and a test checks they give identical features.
+- **Split by run**: 90 training runs, 30 validation runs (early stopping), 30 test runs never seen.
+
+Mean absolute error on the 30 held-out runs (queued vehicles, lower is better; mean queue 7.5):
+
+| | Persistence ("same as now") | Recent 2-min mean | **LightGBM** |
+|---|---|---|---|
+| All test runs | 5.25 | 4.12 | **3.31** (−37%) |
+| Fixed timer | 4.81 | 4.05 | **3.08** |
+| Gap-out | 5.98 | 4.51 | **3.88** |
+| RL agent | 4.97 | 3.80 | **2.96** |
+| Demand > 450 veh/h (over capacity) | 10.27 | 7.42 | **6.07** |
+
+![Predictor results](experiments/results/predict/20261111-063145/plot.png)
+
+The model's most useful inputs are the demand settings, then the signal-cycle position
+(seconds since the approach's last green). It predicts the *level* of the queue well, but it rounds
+off the sawtooth: when it can't be sure whether the light will have just turned green (queue near 0)
+or be about to (queue at its peak), the error-minimising answer is in between. Full report:
+[`experiments/results/predict/20261111-063145/report.md`](experiments/results/predict/20261111-063145/report.md).
+

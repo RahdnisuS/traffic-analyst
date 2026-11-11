@@ -191,3 +191,44 @@ rl:
     clip_range: 0.2
     ent_coef: 0.01        # a little exploration bonus so it doesn't lock into "never switch"
     net_arch: [64, 64]
+
+# Congestion predictor (Phase 9): LightGBM forecasts the number of queued vehicles on each
+# approach horizon_s (2 min) ahead, from what the run logs record up to now.
+# DATA: `python -m predict.generate` logs dataset_runs runs with the normal RunLogger into
+#   dataset_dir (its own folder, so 150 generated runs don't flood the dashboard's run list or,
+#   later, the analyst's knowledge base). Each run gets random traffic, signal timing, driver
+#   behaviour and vehicle mix, and one of the controllers (round-robin), so the model has seen
+#   every situation the dashboard can produce, under every controller that can drive it.
+# SPLIT is by RUN, never by row: every 5th run is held out for testing, the run before it is
+#   the validation set for early stopping. Rows one second apart are almost identical, so a
+#   random row split would put near-copies of the test rows in the training set.
+# BASELINE: "persistence" (the queue in 2 min = the queue now). With the default 25 s greens the
+#   cycle is ~120 s, so persistence is also "same as one cycle ago": a strong naive forecast.
+predict:
+  horizon_s: 120
+  dataset_dir: data/predictor_runs
+  dataset_runs: 150
+  run_s: 1200             # 20 simulated minutes per run, from an empty junction (like the dashboard)
+  sample_every_s: 5       # one training sample per approach every 5 s (1 s rows are near-duplicates)
+  controllers: [fixed, gap_out, rl]   # rl is skipped (with a warning) if no trained model exists
+  demand_vph: [100, 600]  # mean demand per approach (capacity ~450): from quiet to oversaturated
+  demand_imbalance: 0.3   # each approach x U(0.7, 1.3)
+  ped_rate_ph: [0, 600]
+  green_s: [15, 40]       # fixed-timer green, drawn per run (the dashboard slider changes it)
+  aggressiveness: [0.2, 0.8]
+  mix_concentration: 20   # vehicle mix ~ Dirichlet(20 x default mix): varied, but around the default
+  seed: 7
+  workers: 14
+  model_path: predict/models/queue_lgbm.txt
+  results_dir: experiments/results/predict
+  lgbm:
+    objective: l1         # we are scored on MAE, so minimise absolute error (also robust to rare
+                          # huge queues in oversaturated runs, which would dominate a squared loss)
+    learning_rate: 0.05
+    num_leaves: 31
+    min_data_in_leaf: 50
+    feature_fraction: 0.9
+    bagging_fraction: 0.8
+    bagging_freq: 1
+    num_boost_round: 3000 # an upper bound: early stopping on the validation runs picks the real number
+    early_stopping_rounds: 100

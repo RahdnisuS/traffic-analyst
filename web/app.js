@@ -61,7 +61,10 @@ function handle(msg) {
       buildMix(msg.vehicle_types);
       frames.clear();
       twinFrames.clear();
-      charts.reset(msg.history, msg.twin_history);
+      state.predictor = msg.predictor;
+      charts.setForecast(msg.predictor?.horizon_s);
+      showForecastNote();
+      charts.reset(msg.history, msg.twin_history, msg.forecast_history);
       $("events").innerHTML = "";
       addEvents(msg.events, msg.twin_events ? "Fixed" : null);
       if (msg.twin_events) addEvents(msg.twin_events, "AI");
@@ -82,7 +85,7 @@ function handle(msg) {
       $("hud-phase").textContent = phaseText(msg);
       break;
     case "metrics":
-      charts.addRows(msg.rows, msg.twin_rows);
+      charts.addRows(msg.rows, msg.twin_rows, msg.forecast);
       if (msg.rows.length) updateKpis(msg.rows.at(-1));
       if (msg.compare) showCompare(msg.compare);
       break;
@@ -166,6 +169,19 @@ function applyAi(s) {
   if (comparing) showCompare(s.compare);
 }
 
+/** The queue chart's note on the dashed lines: what they are and how far to trust them (the
+ *  model's error on held-out runs next to the naive "same as now" forecast). */
+function showForecastNote() {
+  const p = state.predictor, el = $("ch-queue-note");
+  el.hidden = !p || state.comparing;
+  if (!p) return;
+  const mins = Math.round(p.horizon_s / 60);
+  el.textContent = `Dashed: forecast ${mins} min ahead (LightGBM). On average off by ${p.mae.toFixed(1)} vehicles, ` +
+    `vs ${p.persistence_mae.toFixed(1)} for "same as now".`;
+  $("ch-queue").setAttribute("aria-label", `Line chart of queued vehicles per approach over the last 5 minutes, ` +
+    `with dashed forecasts ${mins} minutes ahead`);
+}
+
 function setComparing(on) {
   if (on === state.comparing) return;
   state.comparing = on;
@@ -175,6 +191,7 @@ function setComparing(on) {
   $("compare").hidden = !on;
   $("kpis").hidden = on; // the comparison panel carries the numbers while it runs
   $("ch-queue-title").textContent = on ? "Queued vehicles, all approaches" : "Queued vehicles by approach";
+  showForecastNote();
   if (!on) {
     twinFrames.clear();
     state.verdict = null;

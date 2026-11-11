@@ -218,6 +218,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .stress-steps .bad { color: var(--critical); font-weight: 600; white-space: nowrap; }
 .controls.locked .slider, .controls.locked .mix { opacity: 0.5; }
 .chart-box { position: relative; height: 180px; }
+.chart-note { margin: -4px 0 6px; font-size: 11px; color: var(--muted); }
 .events { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; font-size: 12px; }
 .events li { padding: 5px 0; border-top: 1px solid var(--border); display: flex; gap: 8px; }
 .events li:first-child { border-top: 0; }

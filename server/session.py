@@ -25,6 +25,12 @@ Phase 8, AI in the UI:
     fair comparison: every random draw (arrivals, vehicle types, pedestrians) happens on every
     step regardless of the signals, so both runs see exactly the same traffic; only the
     controller differs. Each run is logged separately, tagged with a shared comparison id.
+
+Phase 9, congestion forecast: if a trained predictor exists (``python -m predict.train_predictor``),
+the main run forecasts every approach's queue 2 minutes ahead once per simulated second, from the
+same metrics rows the chart shows. Forecasts go out with the metrics (``forecast``) and in ``init``
+(``forecast_history``, ``predictor``). Not during a comparison: its charts show totals for two
+controllers, and a third kind of line would muddle that story.
 """
 
 from __future__ import annotations
@@ -122,6 +128,10 @@ class LiveRun:
         self.pending_rows: list[dict] = []
         self.pending_events: list[dict] = []
         self.status_dirty = False
+        # Queue forecasts (Phase 9): set by the session for the run whose charts are shown.
+        self.forecaster = None
+        self.forecasts: deque[dict] = deque(maxlen=HISTORY_ON_CONNECT)
+        self.pending_forecasts: list[dict] = []
         # Comparison totals since t = 0.
         self.waited_veh_s = 0.0
         self.delay_sum, self.trips = 0.0, 0
@@ -141,6 +151,8 @@ class LiveRun:
             self.logger.record(row, events, trips, ped_trips)
         if row is not None:
             self.pending_rows.append(row)
+            if self.forecaster is not None:
+                self._forecast(sim)
         self.pending_events.extend(events)
         self.waited_veh_s += waiting_now(sim) * sim.dt
         for t in trips:
@@ -149,6 +161,16 @@ class LiveRun:
         for p in ped_trips:
             self.ped_wait_sum += p.wait_time
             self.ped_trips += 1
+
+    def _forecast(self, sim) -> None:
+        try:
+            f = self.forecaster.forecast(self.collector.history, sim, self.controller)
+        except Exception:  # a forecast is a nice-to-have: never let it stop the simulation
+            log.exception("queue forecast failed; forecasting turned off for this run")
+            self.forecaster = None
+            return
+        self.forecasts.append(f)
+        self.pending_forecasts.append(f)
 
     def log_events(self, events: list[dict]) -> list[dict]:
         """Events raised outside a sim step (stopping the stress test, a controller swap) still
@@ -214,11 +236,13 @@ class SimSession:
         self._model_lock = asyncio.Lock()
         self.twin: LiveRun | None = None   # comparison mode: the AI run (main run = fixed timer)
         self.compare_id: str | None = None
+        self.forecaster = self._load_forecaster()
         if self.controller == "rl":
             # The model loads asynchronously (in a thread) and there is no event loop yet, so the
             # dashboard always starts on the fixed timer; the AI is one click away.
             self.controller = "fixed"
         self.run = self._new_run(cfg.sim.seed, None, self.controller)
+        self._attach_forecaster()
 
     # convenience: most callers mean the main run
     @property
@@ -232,6 +256,24 @@ class SimSession:
     # ------------------------------------------------------------------ lifecycle
     def ai_available(self) -> bool:
         return self.base_cfg.rl_model_path().is_file()
+
+    def _load_forecaster(self):
+        """The queue predictor, if one has been trained. It is small (a text file of trees) and
+        lightgbm imports quickly, so unlike the RL model it loads at start-up."""
+        if not self.base_cfg.predict_model_path().is_file():
+            return None
+        try:
+            from predict.forecaster import QueueForecaster
+            return QueueForecaster.load(self.base_cfg)
+        except Exception:  # no lightgbm, or a model from an older feature list: run without it
+            log.exception("queue predictor not loaded; the dashboard runs without forecasts")
+            return None
+
+    def _attach_forecaster(self) -> None:
+        """Forecast for the main run only, and not while comparing (see the module docstring)."""
+        self.run.forecaster = None if self.twin else self.forecaster
+        if self.twin:
+            self.twin.forecaster = None
 
     async def _ensure_model(self):
         """Load the trained network once, in a worker thread (importing torch takes seconds and
@@ -344,6 +386,8 @@ class SimSession:
                        "ped_clear_s": self.sim.ped_clear_s},
             "ped_radius": self.sim.cfg.pedestrians.radius,
             "benchmark": self.benchmark_brief(),
+            "predictor": self.forecaster.brief() if self.forecaster else None,
+            "forecast_history": list(self.run.forecasts) if self.run.forecaster else [],
             "history": list(self.run.collector.history)[-HISTORY_ON_CONNECT:],
             "twin_history": list(self.twin.collector.history)[-HISTORY_ON_CONNECT:] if self.twin else None,
             "events": list(self.run.recent_events),
@@ -406,6 +450,7 @@ class SimSession:
                 self._open_compare(seed, keep)
             else:
                 self.run = self._new_run(seed, keep, self.controller)
+            self._attach_forecaster()
             self.last_error = None
             self._broadcast(self.init_message())
         elif isinstance(cmd, SettingsCmd):
@@ -439,6 +484,7 @@ class SimSession:
         tags = {"compare_id": self.compare_id}
         self.run = self._new_run(seed, settings, "fixed", {**tags, "compare_side": "fixed"})
         self.twin = self._new_run(seed, settings, "rl", {**tags, "compare_side": "rl"})
+        self._attach_forecaster()
 
     async def _start_compare(self) -> None:
         if self.twin:
@@ -464,6 +510,7 @@ class SimSession:
         keep, drop = (self.twin, self.run) if self.controller == "rl" else (self.run, self.twin)
         drop.close()
         self.run, self.twin, self.compare_id = keep, None, None
+        self._attach_forecaster()
         self._broadcast(self.init_message())
 
     # ------------------------------------------------------------------ main loop
@@ -498,9 +545,12 @@ class SimSession:
             if twin:
                 msg["twin_rows"] = twin.pending_rows
                 msg["compare"] = self.comparison()
+            if main.pending_forecasts:
+                msg["forecast"] = main.pending_forecasts
             self._broadcast(msg)
             for r in runs:
                 r.pending_rows = []
+                r.pending_forecasts = []
         if main.pending_events or (twin and twin.pending_events):
             msg = {"type": "events", "events": main.pending_events}
             if twin:

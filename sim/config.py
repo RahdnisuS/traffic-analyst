@@ -222,6 +222,51 @@ class RLSettings(_Strict):
         return self
 
 
+class LGBMSettings(_Strict):
+    """LightGBM hyperparameters for the queue predictor (see the predict section of config.yaml)."""
+    objective: Literal["l1", "l2", "huber"] = "l1"
+    learning_rate: float = Field(0.05, gt=0)
+    num_leaves: int = Field(31, ge=2)
+    min_data_in_leaf: int = Field(50, ge=1)
+    feature_fraction: float = Field(0.9, gt=0, le=1)
+    bagging_fraction: float = Field(0.8, gt=0, le=1)
+    bagging_freq: int = Field(1, ge=0)
+    num_boost_round: int = Field(3000, ge=1)
+    early_stopping_rounds: int = Field(100, ge=1)
+
+
+class PredictSettings(_Strict):
+    """Phase 9: LightGBM congestion predictor. See the predict section of config.yaml."""
+    horizon_s: int = Field(120, ge=1)
+    dataset_dir: str = "data/predictor_runs"
+    dataset_runs: int = Field(150, ge=5)
+    run_s: float = Field(1200.0, gt=0)
+    sample_every_s: int = Field(5, ge=1)
+    controllers: list[Literal["fixed", "gap_out", "rl"]] = Field(
+        default_factory=lambda: ["fixed", "gap_out", "rl"])
+    demand_vph: tuple[float, float] = (100.0, 600.0)
+    demand_imbalance: float = Field(0.3, ge=0, lt=1)
+    ped_rate_ph: tuple[float, float] = (0.0, 600.0)
+    green_s: tuple[float, float] = (15.0, 40.0)
+    aggressiveness: tuple[float, float] = (0.2, 0.8)
+    mix_concentration: float = Field(20.0, gt=0)
+    seed: int = 7
+    workers: int = Field(14, ge=1)
+    model_path: str = "predict/models/queue_lgbm.txt"
+    results_dir: str = "experiments/results/predict"
+    lgbm: LGBMSettings = LGBMSettings()
+
+    @model_validator(mode="after")
+    def _ranges(self) -> "PredictSettings":
+        for name in ("demand_vph", "ped_rate_ph", "green_s", "aggressiveness"):
+            lo, hi = getattr(self, name)
+            if not 0 <= lo <= hi:
+                raise ValueError(f"{name} must be [low, high] with 0 <= low <= high")
+        if not self.controllers:
+            raise ValueError("predict.controllers must name at least one controller")
+        return self
+
+
 class Config(_Strict):
     sim: SimSettings = SimSettings()
     vehicle_types: dict[str, VehicleTypeParams]
@@ -234,6 +279,7 @@ class Config(_Strict):
     logging: LoggingSettings = LoggingSettings()
     benchmark: BenchmarkSettings = BenchmarkSettings()
     rl: RLSettings = RLSettings()
+    predict: PredictSettings = PredictSettings()
 
     @model_validator(mode="after")
     def _mix_types_exist(self) -> "Config":
@@ -257,6 +303,19 @@ class Config(_Strict):
     def rl_results_path(self) -> Path:
         p = Path(self.rl.results_dir)
         return p if p.is_absolute() else PROJECT_ROOT / p
+
+    def _rooted(self, path: str) -> Path:
+        p = Path(path)
+        return p if p.is_absolute() else PROJECT_ROOT / p
+
+    def predict_dataset_path(self) -> Path:
+        return self._rooted(self.predict.dataset_dir)
+
+    def predict_model_path(self) -> Path:
+        return self._rooted(self.predict.model_path)
+
+    def predict_results_path(self) -> Path:
+        return self._rooted(self.predict.results_dir)
 
     def benchmark_path(self) -> Path:
         p = Path(self.benchmark.results_dir)
