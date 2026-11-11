@@ -18,6 +18,8 @@ Work in progress. The full README (architecture diagram, results, learnings) com
       "same as now", drawn as dashed lines running ahead of the live queue chart
 - [x] Phase 10: experiments: 5 controllers on the same 90 random scenarios. The AI beats the fixed timer (−27% waiting),
       a Webster-timed fixed timer (−12%) and gap-out (−7%), and ties with classic actuated control
+- [x] Phase 11: knowledge base for the analyst: traffic-engineering PDFs + run logs in ChromaDB, hybrid search
+      (BM25 + vectors, reciprocal rank fusion) with cross-encoder re-ranking and time-aware run search
 
 ## Quick start
 ```bash
@@ -34,6 +36,8 @@ python -m sim --controller rl # headless run with the trained agent
 python -m predict.generate    # log 150 varied runs for the queue predictor (~90 s on 14 cores)
 python -m predict.train_predictor  # train LightGBM on them (~15 s); the dashboard picks it up
 python -m experiments         # 5 controllers x 90 random scenarios (~5 min on 14 cores; --quick to smoke-test)
+python -m rag.build           # index docs/*.pdf + data/runs/ for the analyst (first run downloads 2 small models)
+python -m rag.search "is a 120 s cycle too long?"   # try the knowledge base
 pytest -q
 ```
 
@@ -207,4 +211,34 @@ sees has a cap; in deep overload queues, backlogs and waits all read "maximum", 
 the same, and it kept saying "keep". The deployed agent now has the same **60 s max-green guard** as
 gap-out and actuated (the network still decides everything below 60 s; forced switches are logged as
 such). With it the AI serves 64% in that scenario, and the other 89 scenarios are unchanged.
+
+## Knowledge base (for the analyst)
+The analyst (Phase 12) answers from two kinds of source, indexed together in ChromaDB:
+
+- **Traffic-engineering documents**: every PDF under `docs/`. The catalogue `rag/sources.yaml` gives
+  each a citation name and says where to download it; the PDFs themselves are not in git (most are
+  copyrighted). Indexed so far: the FHWA *Traffic Signal Timing Manual* (2008) and *MUTCD 2009 Part 4*
+  (both public domain), plus a local copy of Kadiyali's *Transportation Engineering* (Indian practice).
+  Pages are cleaned (running headers, tables of contents, OCR junk), cut into ~200-word passages
+  that never cross a page, and cited with the page number **as printed** ("FHWA Signal Timing
+  Manual, p. 6-28") and the section they belong to.
+- **Simulation runs**: every run in `data/runs/`, turned into prose (the embedding model reads
+  English, not CSV): an overview per run, one chunk per minute (signals, queues per approach with
+  peaks and times, arrivals, delay, LOS, every event in words), and one chunk per minute of the RL
+  agent's decisions (what it saw, what it chose, how sure it was). Every number comes from the
+  log. Cited as "run <id> @ 3:00-4:00".
+
+Retrieval is **hybrid**: BM25 (exact words: section numbers, "spillback", clock times) and vector
+search (meaning: all-MiniLM-L6-v2) each return 30 candidates, **reciprocal rank fusion** merges the two
+rankings, and a **cross-encoder** (ms-marco-MiniLM-L-6-v2) re-reads the top 30 with the question and
+keeps the best 5. A question that names a time ("why did the AI switch at 1:35?", "minute 4") puts
+the run windows covering that time first: timestamps are matched exactly, not by similarity. About
+0.7 s per question on a CPU once the models are loaded (11 ms without the re-ranker).
+
+```bash
+python -m rag.build                     # incremental: only new or changed PDFs and runs are re-indexed
+python -m rag.search "how long should the pedestrian clearance interval be"
+python -m rag.search "why did the AI switch at 1:35?" --run 20261108-140830_rl_s42
+python -m rag.search "PCU values for two-wheelers" --source doc --mode hybrid   # modes: vector, bm25, hybrid, hybrid_rerank
+```
 

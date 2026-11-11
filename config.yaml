@@ -281,3 +281,27 @@ experiments:
   seed: 2026
   workers: 14
   results_dir: experiments/results/comparison
+
+# Knowledge base for the analyst (Phase 11). Two sources, one index:
+#   documents: every PDF under docs_dir (catalogue with titles/URLs in rag/sources.yaml; the PDFs
+#              themselves are not in git), cut into ~chunk_words-word passages within one page
+#   run logs:  every run in logging.runs_dir, summarised into prose: one overview per run, one
+#              chunk per run_window_s, and one chunk of RL decisions per window (rag/run_indexer.py)
+# Retrieval (rag/retrieval.py) is HYBRID: BM25 (exact words: "4D.05", "3:20", "spillback") and
+#   vectors (meaning: "too long a cycle" ~ "excessive cycle length") each return `candidates`
+#   chunks; reciprocal rank fusion merges the two rankings (score = sum of 1 / (rrf_k + rank));
+#   a cross-encoder then re-reads the top rerank_pool (query, chunk) pairs together and picks
+#   the final top_k.
+rag:
+  chroma_dir: chroma              # gitignored; rebuilt by `python -m rag.build`
+  collection: traffic_knowledge
+  docs_dir: docs
+  embedding_model: sentence-transformers/all-MiniLM-L6-v2   # 384-d, fast on CPU; reads <= 256 word pieces
+  reranker_model: cross-encoder/ms-marco-MiniLM-L-6-v2      # trained on real search queries (MS MARCO)
+  chunk_words: 200                # fits the embedding model's 256-word-piece limit
+  chunk_overlap: 40
+  run_window_s: 60
+  candidates: 30                  # per retriever, before fusion
+  rrf_k: 60                       # the standard RRF constant (Cormack et al. 2009): damps the top ranks
+  rerank_pool: 30
+  top_k: 5

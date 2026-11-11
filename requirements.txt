@@ -19,3 +19,8 @@ sb3-contrib>=2.4      # MaskablePPO: PPO with invalid-action masking
 lightgbm>=4.5
 # Phase 10: experiment statistics (Wilcoxon signed-rank test)
 scipy>=1.11
+# Phase 11: knowledge base (RAG)
+pymupdf>=1.24
+sentence-transformers>=3.0
+chromadb>=0.5
+rank_bm25>=0.2.2

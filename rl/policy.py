@@ -79,21 +79,24 @@ class RLPolicy:
         stats = approach_stats(sim)
         order = serving_order(sim)  # read BEFORE switching: the obs describes this moment
         obs = observe(sim, stats)
+        green_s = controller.time_in_stage  # BEFORE switching: a switch resets the stage timer (amber)
         action, p_switch, value = self.act(obs)
         forced = (self.max_green_s is not None and action != SWITCH
                   and controller.time_in_stage >= self.max_green_s - 1e-6)
         switched = (action == SWITCH or forced) and controller.request_switch()
-        rec = self.record(sim, obs, stats, order, action, switched, p_switch, value)
+        rec = self.record(sim, obs, stats, order, action, switched, p_switch, value, green_s)
         if forced:
             rec["forced"] = "max_green"
         sim.decisions.append(rec)
 
-    def record(self, sim, obs, stats, order, action, switched, p_switch, value) -> dict:
+    def record(self, sim, obs, stats, order, action, switched, p_switch, value, green_s: float) -> dict:
         sig = sim.signals
         return {
             "t": round(sim.time, 1), "clock": clock(sim.time), "model": self.model_id,
             "phase": sig.phase.name, "next_phase": "+".join(order[1]) if len(order) > 1 else None,
-            "time_in_green_s": round(sig.time_in_stage, 1),
+            # How long the green had run when the agent decided. (Logs written before 2026-11-11 hold
+            # the time AFTER a switch, i.e. 0, on switch decisions; obs.time_in_green is right in both.)
+            "time_in_green_s": round(green_s, 1),
             "action": "switch" if action == SWITCH else "keep", "switched": bool(switched),
             "p_switch": round(p_switch, 4), "value": round(value, 3),
             # What it saw, per approach in real units (the network gets these in serving order).

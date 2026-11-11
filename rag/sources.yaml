@@ -1,0 +1,39 @@
+# Catalogue of the documents in the knowledge base. The PDFs themselves are NOT in git (most
+# guidelines are copyrighted, and this repository is public): download them from `url` into docs/
+# (any subfolder), then run `python -m rag.build`.
+#
+# A PDF that is not listed here is still ingested, titled from its own metadata or file name.
+# Add an entry to give it a proper title and citation name.
+#   file:      file name (matched anywhere under docs/)
+#   id:        short stable id used in chunk ids
+#   title:     full title;  cite: the short name the analyst cites ("<cite>, p. <page>")
+#   publisher, year, url, license: provenance, shown with citations
+
+- file: fhwa_signal_timing_manual_2008.pdf
+  id: fhwa-stm
+  title: Traffic Signal Timing Manual (FHWA-HOP-08-024)
+  cite: FHWA Signal Timing Manual
+  publisher: U.S. Federal Highway Administration
+  year: 2008
+  url: https://ops.fhwa.dot.gov/publications/fhwahop08024/fhwa_hop_08_024.pdf
+  license: public domain (U.S. government work)
+
+- file: mutcd_2009_part4_signals.pdf
+  id: mutcd-4
+  title: "Manual on Uniform Traffic Control Devices, 2009 Edition (Rev. 1 and 2), Part 4: Highway Traffic Signals"
+  cite: MUTCD 2009 Part 4
+  publisher: U.S. Federal Highway Administration
+  year: 2009
+  url: https://mutcd.fhwa.dot.gov/pdfs/2009r1r2/part4.pdf
+  license: public domain (U.S. government work)
+
+# Added by the project owner: an Indian textbook (IRC practice, Indian traffic conditions).
+# Copyrighted: kept local only (docs/**/*.pdf is gitignored).
+- file: transportation-engineering.pdf
+  id: kadiyali-te
+  title: Transportation Engineering (L. R. Kadiyali)
+  cite: Kadiyali, Transportation Engineering
+  publisher: ""
+  year: ""
+  url: ""
+  license: copyrighted (local copy, not redistributed)

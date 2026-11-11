@@ -303,6 +303,28 @@ class ExperimentSettings(_Strict):
         return self
 
 
+class RAGSettings(_Strict):
+    """Phase 11: knowledge base and hybrid retrieval. See the rag section of config.yaml."""
+    chroma_dir: str = "chroma"
+    collection: str = "traffic_knowledge"
+    docs_dir: str = "docs"
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    chunk_words: int = Field(200, ge=20)
+    chunk_overlap: int = Field(40, ge=0)
+    run_window_s: float = Field(60.0, gt=0)
+    candidates: int = Field(30, ge=1)
+    rrf_k: int = Field(60, ge=1)
+    rerank_pool: int = Field(30, ge=1)
+    top_k: int = Field(5, ge=1)
+
+    @model_validator(mode="after")
+    def _overlap(self) -> "RAGSettings":
+        if self.chunk_overlap >= self.chunk_words:
+            raise ValueError("rag.chunk_overlap must be smaller than rag.chunk_words")
+        return self
+
+
 class Config(_Strict):
     sim: SimSettings = SimSettings()
     vehicle_types: dict[str, VehicleTypeParams]
@@ -318,6 +340,7 @@ class Config(_Strict):
     predict: PredictSettings = PredictSettings()
     actuated: ActuatedSettings = ActuatedSettings()
     experiments: ExperimentSettings = ExperimentSettings()
+    rag: RAGSettings = RAGSettings()
 
     @model_validator(mode="after")
     def _mix_types_exist(self) -> "Config":
@@ -345,6 +368,12 @@ class Config(_Strict):
     def _rooted(self, path: str) -> Path:
         p = Path(path)
         return p if p.is_absolute() else PROJECT_ROOT / p
+
+    def chroma_path(self) -> Path:
+        return self._rooted(self.rag.chroma_dir)
+
+    def docs_path(self) -> Path:
+        return self._rooted(self.rag.docs_dir)
 
     def experiments_path(self) -> Path:
         return self._rooted(self.experiments.results_dir)
