@@ -18,3 +18,4 @@ predict/models/
 # Phase 11: PDFs for the knowledge base (most guidelines are copyrighted; rag/sources.yaml says where to get them)
 docs/**/*.pdf
 data/analyst/
+eval/work/

@@ -24,3 +24,10 @@ pymupdf>=1.24
 sentence-transformers>=3.0
 chromadb>=0.5
 rank_bm25>=0.2.2
+# Phase 13: RAG evaluation. ragas 0.4.3 imports langchain_community.chat_models.vertexai, which
+# langchain-community 0.4 removed: keep the 0.3 line of the LangChain packages for it.
+ragas==0.4.3
+langchain-community>=0.3,<0.4
+langchain-core>=0.3,<1.0
+langchain>=0.3,<1.0
+langchain-openai>=0.3,<0.4

@@ -126,12 +126,15 @@ class AnalystContext:
 
 
 class Analyst:
-    def __init__(self, cfg, retriever, llm: GroqClient, kb=None):
+    def __init__(self, cfg, retriever, llm: GroqClient, kb=None, retrieval_mode: str = "hybrid_rerank"):
+        """``retrieval_mode``: vector | bm25 | hybrid | hybrid_rerank (the dashboard always uses the
+        last; Phase 13 answers the same questions with each to measure what every stage adds)."""
         self.cfg = cfg
         self.a = cfg.analyst
         self.retriever = retriever
         self.llm = llm
         self.kb = kb
+        self.mode = retrieval_mode
 
     # ------------------------------------------------------------------ public
     def ask(self, question: str, history: list[dict], ctx: AnalystContext) -> dict:
@@ -200,10 +203,10 @@ class Analyst:
             f = {"run_id": runs}
             if intent == "decision":
                 f["kind"] = ["rl_decisions", "run_window"]
-            hits += self.retriever.search(q, k=a.k_run if intent != "mixed" else a.k_mixed, filters=f)
+            hits += self.retriever.search(q, k=a.k_run if intent != "mixed" else a.k_mixed, filters=f, mode=self.mode)
         if intent in ("guideline", "mixed"):
             hits += self.retriever.search(q, k=a.k_doc if intent == "guideline" else a.k_mixed,
-                                          filters={"source_type": "doc"})
+                                          filters={"source_type": "doc"}, mode=self.mode)
         sources = [self._source(h.text, h.metadata, cid=h.id) for h in hits]
         if intent in ("run", "decision", "mixed") and runs:
             # The run's overview (settings, totals) and, for the live run, the dashboard right now.

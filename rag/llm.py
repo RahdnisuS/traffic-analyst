@@ -13,10 +13,12 @@ The API key comes from the environment or the gitignored .env file, never from c
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 import httpx
 
@@ -27,6 +29,10 @@ API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 class LLMError(RuntimeError):
     """A failure the analyst reports to the user instead of an answer."""
+
+
+class RateLimited(LLMError):
+    """Every model's rate limit is exhausted (e.g. the free tier's daily cap)."""
 
 
 def load_api_key() -> str | None:
@@ -53,11 +59,16 @@ class LLMReply:
 
 class GroqClient:
     def __init__(self, model: str, fallback_model: str | None = None, api_key: str | None = None,
-                 timeout_s: float = 60.0):
+                 timeout_s: float = 60.0, cache_dir: str | Path | None = None, wait_on_limit_s: float = 0.0):
+        """``cache_dir``: store every reply on disk, keyed by the request (evaluation). ``wait_on_limit_s``:
+        on a rate limit whose retry-after is at most this long, wait and retry the same model instead of
+        falling back (evaluation: answers must all come from one model)."""
         self.model = model
         self.fallback_model = fallback_model
         self.api_key = api_key or load_api_key()
         self.timeout_s = timeout_s
+        self.cache_dir = Path(cache_dir) if cache_dir else None
+        self.wait_on_limit_s = wait_on_limit_s
 
     @property
     def available(self) -> bool:
@@ -68,9 +79,29 @@ class GroqClient:
         if not self.api_key:
             raise LLMError("The analyst needs a Groq API key: put GROQ_API_KEY=... in the .env file "
                            "(see .env.example) and restart the server.")
+        key = None
+        if self.cache_dir is not None:
+            # Evaluation: the same request always gets the same (stored) reply, so a run interrupted by
+            # the daily rate limit resumes where it stopped, and re-scoring never re-pays for answers.
+            key = hashlib.sha256(json.dumps([self.model, messages, json_mode, temperature, max_tokens,
+                                             reasoning_effort], sort_keys=True).encode()).hexdigest()
+            hit = self.cache_dir / f"{key}.json"
+            if hit.is_file():
+                d = json.loads(hit.read_text(encoding="utf-8"))
+                return LLMReply(d["text"], d["model"], d["prompt_tokens"], d["completion_tokens"], 0.0)
+        reply = self._call(messages, json_mode, temperature, max_tokens, reasoning_effort)
+        if key is not None:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+            (self.cache_dir / f"{key}.json").write_text(json.dumps(reply.__dict__), encoding="utf-8")
+        return reply
+
+    def _call(self, messages, json_mode, temperature, max_tokens, reasoning_effort) -> LLMReply:
         models = [self.model] + ([self.fallback_model] if self.fallback_model else [])
         last = None
-        for model in models:
+        waits = 0
+        i = 0
+        while i < len(models):
+            model = models[i]
             body = {"model": model, "messages": messages, "temperature": temperature,
                     "max_completion_tokens": max_tokens, "include_reasoning": False}
             if model.startswith("openai/gpt-oss"):
@@ -87,7 +118,16 @@ class GroqClient:
                                "Check the internet connection and try again.") from exc
             if r.status_code == 429:
                 last = r
-                continue  # rate limited: try the fallback model
+                try:
+                    retry = float(r.headers.get("retry-after", "60"))
+                except ValueError:
+                    retry = 60.0
+                if self.wait_on_limit_s and retry <= self.wait_on_limit_s and waits < 20:
+                    waits += 1  # per-minute budget: wait it out on the SAME model (evaluation)
+                    time.sleep(retry + 1.0)
+                    continue
+                i += 1  # rate limited: try the fallback model
+                continue
             if r.status_code == 401:
                 raise LLMError("The Groq API key was rejected (401): check GROQ_API_KEY in .env.")
             if r.status_code != 200:
@@ -102,8 +142,8 @@ class GroqClient:
             return LLMReply(text, model, u.get("prompt_tokens", 0), u.get("completion_tokens", 0),
                             round(time.perf_counter() - t0, 2))
         wait = last.headers.get("retry-after") if last is not None else None
-        raise LLMError("The free-tier rate limit of the language model was reached"
-                       + (f"; try again in about {wait} s." if wait else "; try again in a minute."))
+        raise RateLimited("The free-tier rate limit of the language model was reached"
+                          + (f"; try again in about {wait} s." if wait else "; try again in a minute."))
 
     def chat_json(self, messages: list[dict], **kw) -> tuple[dict, LLMReply]:
         """A JSON object reply. JSON mode guarantees syntax; the caller validates the content."""
