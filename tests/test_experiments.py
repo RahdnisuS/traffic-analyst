@@ -100,3 +100,29 @@ def test_every_controller_runs_the_same_scenario(tmp_path):
     # The scenario's settings reach the config.
     c = scenario_config(cfg, sc)
     assert c.demand.per_approach_vph == sc["per_approach_vph"] and c.pedestrians.rate_ph == sc["ped_rate_ph"]
+
+
+def test_rl_max_green_guard_switches_an_agent_that_never_wants_to():
+    """The Phase 10 failure mode, reduced: a network that always says "keep" would hold the first
+    green forever. With the guard it switches at the first decision point after 60 s, and the
+    decision log says the guard did it (the network's own answer is kept)."""
+    pytest.importorskip("torch")
+    from rl.policy import RLPolicy
+
+    class AlwaysKeep(RLPolicy):
+        def act(self, obs):
+            return 0, 0.01, -1.0
+
+    cfg = load_config()
+    cfg.pedestrians.rate_ph = 0.0
+    for guard, expect_switch in ((None, False), (60.0, True)):
+        sim = Simulation(cfg, seed=2, policy=AlwaysKeep(None, cfg.rl.decision_interval_s, max_green_s=guard))
+        sim.run(120)
+        ambers = [e.time for e in sim.signals.events if e.stage == "amber"]
+        if not expect_switch:
+            assert ambers == []  # unguarded: stuck on the first green
+            assert not any(d.get("forced") for d in sim.decisions)
+        else:
+            assert ambers[0] == pytest.approx(60.0, abs=0.11)  # 60 s is on the 5 s decision grid
+            forced = [d for d in sim.decisions if d.get("forced")]
+            assert forced and forced[0]["action"] == "keep" and forced[0]["switched"]

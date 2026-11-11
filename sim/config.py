@@ -197,6 +197,7 @@ class PPOSettings(_Strict):
 class RLSettings(_Strict):
     """Phase 7: PPO signal controller. See the rl section of config.yaml for the reasoning."""
     decision_interval_s: float = Field(5.0, gt=0)
+    max_green_s: float | None = Field(60.0, gt=0)  # deployed safety net; see rl/policy.py
     episode_s: float = Field(900.0, gt=0)
     reward_scale: float = Field(100.0, gt=0)
     switch_penalty: float = Field(0.2, ge=0)

@@ -72,7 +72,8 @@ def _policy(cfg: Config, controller: str):
         if _RL_POLICY is None:
             _RL_POLICY = RLPolicy.load(cfg)
         # A fresh policy object per run (its decision clock), sharing the loaded network.
-        return RLPolicy(_RL_POLICY.model, cfg.rl.decision_interval_s, model_id=_RL_POLICY.model_id)
+        return RLPolicy(_RL_POLICY.model, cfg.rl.decision_interval_s, model_id=_RL_POLICY.model_id,
+                        max_green_s=cfg.rl.max_green_s)
     return None  # Simulation's default: the fixed-time plan from cfg.signals.green_s
 
 

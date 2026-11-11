@@ -167,6 +167,11 @@ benchmark:
 #   the agent learns a policy for any slider setting rather than one memorised demand level.
 rl:
   decision_interval_s: 5
+  max_green_s: 60         # DEPLOYED agent only (dashboard, experiments): after 60 s of green it
+                          # switches at the next decision point whatever the network says, the
+                          # same max-out as gap-out and actuated. Added in Phase 10 after the agent
+                          # held one green for 16 min in deep overload (all its inputs at their cap).
+                          # Training is unchanged (the env has no guard).
   episode_s: 900          # 15 simulated minutes per episode, from an empty junction
   reward_scale: 100       # 100 vehicle-seconds of waiting = -1 reward
   switch_penalty: 0.2     # = 20 vehicle-seconds of waiting

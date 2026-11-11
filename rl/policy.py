@@ -9,6 +9,16 @@ and how good it judged the situation (the critic's value estimate). That is what
 analyst (Phase 12) answer "why did the AI switch early at 3:20?" from data, not guesswork.
 
 Inference is deterministic (the most likely action), so a run is reproducible from its seed.
+
+MAX-GREEN GUARD (added in Phase 10): once a green has run ``max_green_s`` the policy switches at
+the next decision point whatever the network says, like the max-out of every actuated controller
+(gap-out and the classic actuated rule use the same 60 s). WHY: the experiment found that in deep
+overload (~135% of capacity) every input the network sees hits its cap (queues, backlogs and
+waits all read "maximum"), every situation looks the same, the network keeps saying "keep", and
+one green ran for 16 minutes while the other approaches overflowed. The network still decides
+everything below the cap; the guard is a safety net, not the controller. The network is still
+asked at a forced switch and its own answer is logged with ``forced: "max_green"``, so the
+analyst can tell "the AI switched" from "the guard switched".
 """
 
 from __future__ import annotations
@@ -27,13 +37,15 @@ KEEP, SWITCH = 0, 1
 class RLPolicy:
     name = "rl"
 
-    def __init__(self, model, decision_interval_s: float, model_id: str = "ppo"):
+    def __init__(self, model, decision_interval_s: float, model_id: str = "ppo",
+                 max_green_s: float | None = None):
         import torch  # imported here so plain fixed-time runs never need torch
 
         self._torch = torch
         self.model = model
         self.model_id = model_id
         self.clock = DecisionClock(decision_interval_s)
+        self.max_green_s = max_green_s  # None = no guard (the network alone, as in training)
         self._names: list[str] | None = None
 
     @classmethod
@@ -43,7 +55,8 @@ class RLPolicy:
         p = Path(path) if path else cfg.rl_model_path()
         if not p.is_file():
             raise FileNotFoundError(f"no trained RL model at {p}: run `python -m rl.train` first")
-        return cls(MaskablePPO.load(p, device="cpu"), cfg.rl.decision_interval_s, model_id=p.stem)
+        return cls(MaskablePPO.load(p, device="cpu"), cfg.rl.decision_interval_s, model_id=p.stem,
+                   max_green_s=cfg.rl.max_green_s)
 
     def act(self, obs: np.ndarray) -> tuple[int, float, float]:
         """(action, P(switch), value estimate) for one observation. Only called when a switch is
@@ -67,8 +80,13 @@ class RLPolicy:
         order = serving_order(sim)  # read BEFORE switching: the obs describes this moment
         obs = observe(sim, stats)
         action, p_switch, value = self.act(obs)
-        switched = action == SWITCH and controller.request_switch()
-        sim.decisions.append(self.record(sim, obs, stats, order, action, switched, p_switch, value))
+        forced = (self.max_green_s is not None and action != SWITCH
+                  and controller.time_in_stage >= self.max_green_s - 1e-6)
+        switched = (action == SWITCH or forced) and controller.request_switch()
+        rec = self.record(sim, obs, stats, order, action, switched, p_switch, value)
+        if forced:
+            rec["forced"] = "max_green"
+        sim.decisions.append(rec)
 
     def record(self, sim, obs, stats, order, action, switched, p_switch, value) -> dict:
         sig = sim.signals

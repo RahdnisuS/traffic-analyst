@@ -294,7 +294,8 @@ class SimSession:
             from rl.policy import RLPolicy
             base = self._model
             # One network, but each sim gets its own policy: the decision clock is per sim.
-            return RLPolicy(base.model, self.base_cfg.rl.decision_interval_s, model_id=base.model_id)
+            return RLPolicy(base.model, self.base_cfg.rl.decision_interval_s, model_id=base.model_id,
+                            max_green_s=self.base_cfg.rl.max_green_s)
         return FixedTimePolicy(sim.cfg.signals.green_times(len(sim.junction.phases)))
 
     def _new_run(self, seed: int, settings: dict | None, controller: str, tags: dict | None = None) -> LiveRun:

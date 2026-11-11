@@ -184,7 +184,8 @@ def _policy(cfg: Config, controller: str, plan: dict | None):
         from rl.policy import RLPolicy
         if _RL is None:
             _RL = RLPolicy.load(cfg)  # once per worker process
-        return RLPolicy(_RL.model, cfg.rl.decision_interval_s, model_id=_RL.model_id)
+        return RLPolicy(_RL.model, cfg.rl.decision_interval_s, model_id=_RL.model_id,
+                        max_green_s=cfg.rl.max_green_s)
     return None  # fixed: the config's plan
 
 
