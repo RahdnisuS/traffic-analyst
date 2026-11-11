@@ -17,3 +17,5 @@ stable-baselines3>=2.4
 sb3-contrib>=2.4      # MaskablePPO: PPO with invalid-action masking
 # Phase 9: congestion predictor
 lightgbm>=4.5
+# Phase 10: experiment statistics (Wilcoxon signed-rank test)
+scipy>=1.11

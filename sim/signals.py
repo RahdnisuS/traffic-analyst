@@ -28,6 +28,7 @@ steps off the kerb on the last second of WALK can still reach the far side.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol
@@ -159,6 +160,96 @@ class SignalController:
 
 class SignalPolicy(Protocol):
     def update(self, controller: SignalController, sim) -> None: ...
+
+
+class ActuatedPolicy:
+    """Classic fully-actuated control (Phase 10): the rule real vehicle-actuated signals run.
+
+    Each approach has a DETECTOR covering the last ``detector_m`` metres before its stop line
+    (an inductive loop / camera zone; on this layout it also covers the bike filter lane). While
+    the green approach's detector is occupied, the green is extended; once it has been empty for
+    ``passage_s`` (the "passage time" or "unit extension") the phase GAPS OUT and the controller
+    moves to the next phase. The green never exceeds ``max_green_s`` (MAX-OUT), so a steady stream
+    on one approach can't starve the others. Min green, amber, all-red and the pedestrian phase
+    stay with SignalController, as for every policy.
+
+    WHY this and gap-out both: gap-out (rl.env.GapOutPolicy) switches when the green approach has
+    NO QUEUED VEHICLE, which needs to see the whole queue: easy in a simulator, but real
+    controllers only know what their detectors report. This policy uses only what a loop near the
+    stop line would see, so it is the fair "what a traffic engineer would install" baseline.
+
+    Simplification: every phase is served in turn ("min recall"), even with no demand on it,
+    exactly like the other controllers here (the RL agent can also only switch to the NEXT phase).
+    Real controllers can skip an empty phase. Runs every simulation step (real actuated
+    controllers evaluate continuously, not on the RL agent's 5 s grid).
+    """
+
+    name = "actuated"
+
+    def __init__(self, detector_m: float = 30.0, passage_s: float = 2.0, max_green_s: float = 60.0):
+        self.detector_m = detector_m
+        self.passage_s = passage_s
+        self.max_green_s = max_green_s
+        self._last_call: float | None = None
+
+    def _occupied(self, controller: SignalController, sim) -> bool:
+        J = sim.junction
+        for arm in sorted(controller.phase.green):
+            for lane_id in J.approach_lanes(arm):
+                lane = sim.lanes[lane_id]
+                # Lanes are ordered front-first, so the first vehicle is the one nearest the line.
+                if lane and lane[0].s >= J.edges[lane_id].length - self.detector_m:
+                    return True
+        return False
+
+    def update(self, controller: SignalController, sim) -> None:
+        if controller.stage is not Stage.GREEN:
+            self._last_call = None
+            return
+        now = sim.time
+        if self._last_call is None or self._occupied(controller, sim):
+            self._last_call = now  # green just started, or a vehicle is on the detector
+        if not controller.can_switch():
+            return
+        if now - self._last_call >= self.passage_s - _EPS or controller.time_in_stage >= self.max_green_s - _EPS:
+            controller.request_switch()
+
+
+def webster_timing(flows_vph: list[float], saturation_vph: float, lost_per_phase_s: float, min_green_s: float,
+                   max_cycle_s: float, ped_rate_ph: float = 0.0, ped_phase_s: float = 0.0) -> dict:
+    """Fixed-time plan for known demand with Webster's method (1958), the classic way to time a
+    fixed signal: one phase per entry of ``flows_vph`` (split phasing: each phase serves one approach).
+
+        y_i = q_i / s                  flow ratio of phase i (its demand / its saturation flow)
+        Y   = sum(y_i)                 how loaded the junction is (>= 1: no cycle can serve it)
+        L   = total lost time per cycle (amber + all-red per phase, + the pedestrian phase)
+        C0  = (1.5 L + 5) / (1 - Y)    the cycle that minimises average delay
+        g_i = (y_i / Y) (C0 - L)       green split in proportion to each phase's load
+
+    The pedestrian phase (on demand, at most once per cycle) is lost time for vehicles when it
+    runs; it runs in a cycle if anyone arrived during it, probability 1 - exp(-rate x C). That
+    depends on C, so C is found by a few fixed-point iterations. The cycle is capped at
+    ``max_cycle_s`` (when Y is near or above 1 the formula explodes; past capacity a longer cycle
+    only adds delay), and every green is at least ``min_green_s``.
+    """
+    y = [q / saturation_vph for q in flows_vph]
+    Y = sum(y)
+    n = len(flows_vph)
+    cycle = max_cycle_s
+    lost = n * lost_per_phase_s
+    for _ in range(20):
+        p_ped = 1.0 - math.exp(-ped_rate_ph / 3600.0 * cycle) if ped_rate_ph > 0 else 0.0
+        lost = n * lost_per_phase_s + p_ped * ped_phase_s
+        c0 = (1.5 * lost + 5.0) / (1.0 - Y) if Y < 0.95 else max_cycle_s
+        new = min(max(c0, lost + n * min_green_s), max_cycle_s)
+        if abs(new - cycle) < 0.01:
+            cycle = new
+            break
+        cycle = new
+    green_total = cycle - lost
+    greens = [max(min_green_s, green_total * yi / Y) if Y > 0 else green_total / n for yi in y]
+    return {"cycle_s": round(cycle, 1), "greens_s": [round(g, 1) for g in greens], "Y": round(Y, 3),
+            "lost_s": round(lost, 1), "capped": cycle >= max_cycle_s - 0.01}
 
 
 class FixedTimePolicy:

@@ -232,3 +232,47 @@ predict:
     bagging_freq: 1
     num_boost_round: 3000 # an upper bound: early stopping on the validation runs picks the real number
     early_stopping_rounds: 100
+
+# Classic vehicle-actuated control (Phase 10, sim/signals.py ActuatedPolicy): a detector covers
+# the last detector_m metres before each stop line. The green is extended while the green
+# approach's detector is occupied; once it has been empty for passage_s the phase "gaps out".
+# It never runs past max_green_s ("max-out"). Min green, amber and all-red still apply.
+actuated:
+  detector_m: 30          # ~2 s of travel at 50 km/h: covers the discharging queue's last vehicles
+  passage_s: 2.0          # gap that ends the green: longer than a discharging queue's headways
+                          # (~2 s per lane for cars, less with bikes), shorter than random arrivals
+  max_green_s: 60         # same cap as the gap-out rule
+
+# Controller comparison (Phase 10, `python -m experiments`): every controller runs the SAME random
+# scenarios (paired design), scenarios_per_band in each demand band.
+# A scenario draws: mean demand per approach U(band), each approach x U(1 -/+ imbalance),
+#   pedestrians U(ped_rate_ph), vehicle mix ~ Dirichlet(mix_concentration x default mix), and a
+#   seed from its own stream (seed below), not the RL agent's training episodes.
+# Each run: warm-up (not scored, so no controller is judged on filling an empty junction), then
+#   measure_s scored.
+# Controllers: fixed = the config's 25 s plan (the dashboard's fixed timer); webster = a fixed
+#   plan re-timed for each scenario's demand with Webster's formula (a fair fixed timer: it is told
+#   the true demand, which a real engineer would only estimate); actuated = classic detector rule;
+#   gap_out = the queue-clear rule from Phase 7; rl = the trained PPO agent.
+# Webster needs the saturation flow (vehicles/hour of green one approach discharges). It is
+#   MEASURED, not assumed: a probe run at saturation_probe_vph per approach (far past capacity,
+#   so every green discharges a standing queue) with saturation_probe_green_s greens.
+experiments:
+  bands:
+    low: [150, 300]       # veh/h per approach; capacity is ~450 (Phase 6 benchmark)
+    medium: [300, 420]
+    high: [420, 550]      # near and past capacity
+  scenarios_per_band: 30
+  demand_imbalance: 0.3
+  ped_rate_ph: [0, 500]
+  mix_concentration: 30
+  warmup_s: 300
+  measure_s: 1200         # 20 min: ~10 cycles, as the benchmark found necessary for stable numbers
+  controllers: [fixed, webster, actuated, gap_out, rl]
+  webster_max_cycle_s: 150
+  saturation_probe_vph: 1200
+  saturation_probe_green_s: 40
+  bootstrap: 10000        # resamples for the 95% confidence intervals of the paired differences
+  seed: 2026
+  workers: 14
+  results_dir: experiments/results/comparison

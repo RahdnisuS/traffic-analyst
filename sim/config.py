@@ -267,6 +267,41 @@ class PredictSettings(_Strict):
         return self
 
 
+class ActuatedSettings(_Strict):
+    """Phase 10: classic vehicle-actuated control (sim.signals.ActuatedPolicy)."""
+    detector_m: float = Field(30.0, gt=0)
+    passage_s: float = Field(2.0, gt=0)
+    max_green_s: float = Field(60.0, gt=0)
+
+
+class ExperimentSettings(_Strict):
+    """Phase 10: controller comparison across random scenarios. See config.yaml."""
+    bands: dict[str, tuple[float, float]] = Field(default_factory=lambda: {
+        "low": (150.0, 300.0), "medium": (300.0, 420.0), "high": (420.0, 550.0)})
+    scenarios_per_band: int = Field(30, ge=2)
+    demand_imbalance: float = Field(0.3, ge=0, lt=1)
+    ped_rate_ph: tuple[float, float] = (0.0, 500.0)
+    mix_concentration: float = Field(30.0, gt=0)
+    warmup_s: float = Field(300.0, ge=0)
+    measure_s: float = Field(1200.0, gt=0)
+    controllers: list[Literal["fixed", "webster", "actuated", "gap_out", "rl"]] = Field(
+        default_factory=lambda: ["fixed", "webster", "actuated", "gap_out", "rl"])
+    webster_max_cycle_s: float = Field(150.0, gt=0)
+    saturation_probe_vph: float = Field(1200.0, gt=0)
+    saturation_probe_green_s: float = Field(40.0, gt=0)
+    bootstrap: int = Field(10000, ge=100)
+    seed: int = 2026
+    workers: int = Field(14, ge=1)
+    results_dir: str = "experiments/results/comparison"
+
+    @model_validator(mode="after")
+    def _ranges(self) -> "ExperimentSettings":
+        for name, (lo, hi) in [*self.bands.items(), ("ped_rate_ph", self.ped_rate_ph)]:
+            if not 0 <= lo <= hi:
+                raise ValueError(f"{name} must be [low, high] with 0 <= low <= high")
+        return self
+
+
 class Config(_Strict):
     sim: SimSettings = SimSettings()
     vehicle_types: dict[str, VehicleTypeParams]
@@ -280,6 +315,8 @@ class Config(_Strict):
     benchmark: BenchmarkSettings = BenchmarkSettings()
     rl: RLSettings = RLSettings()
     predict: PredictSettings = PredictSettings()
+    actuated: ActuatedSettings = ActuatedSettings()
+    experiments: ExperimentSettings = ExperimentSettings()
 
     @model_validator(mode="after")
     def _mix_types_exist(self) -> "Config":
@@ -307,6 +344,9 @@ class Config(_Strict):
     def _rooted(self, path: str) -> Path:
         p = Path(path)
         return p if p.is_absolute() else PROJECT_ROOT / p
+
+    def experiments_path(self) -> Path:
+        return self._rooted(self.experiments.results_dir)
 
     def predict_dataset_path(self) -> Path:
         return self._rooted(self.predict.dataset_dir)
