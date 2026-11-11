@@ -1,0 +1,10 @@
+# What `gcloud run deploy --source .` may upload to Cloud Build: everything git would track
+# (.gitignore already keeps out .env, every PDF, local runs and the index), minus what the
+# image doesn't need. Never upload: .env (secrets) and docs/**/*.pdf (the owner's copyrighted book).
+#!include:.gitignore
+#!include:.dockerignore
+.git
+.gitignore
+experiments/results/rl/2026110*
+!experiments/results/rl/20261108-185428/
+eval/results/

@@ -1,7 +1,63 @@
 # Traffic Analyst
 
-A road-junction simulator with reinforcement-learning signal control and an LLM (RAG) analyst.
-Work in progress. The full README (architecture diagram, results, learnings) comes in Phase 14.
+A road-junction simulator with mixed Indian traffic (cars, bikes, autos, buses, pedestrians), a
+**reinforcement-learning** signal controller, a **LightGBM** queue forecaster and an **LLM analyst
+(RAG)** that explains what happened, cites run logs and traffic-engineering manuals, and turns
+plain-English scenarios into settings. Python backend (simulation written from scratch, no SUMO),
+plain-JavaScript frontend with a 2.5D Three.js view.
+
+**Headline results** (details below):
+- AI signal control: **−27% total waiting** vs the fixed timer, −12% vs a Webster-timed plan, −7% vs
+  gap-out over 90 paired scenarios (p < 0.001); a statistical tie with classic actuated control, but
+  pedestrians wait 17% less.
+- Capacity of the default junction: **1,790 ± 54 veh/h**.
+- Queue forecast 2 minutes ahead: **37% lower error** than "same as now".
+- Retrieval for the analyst: the passage a correct answer needs is found for **100%** of questions with
+  hybrid search + re-ranking, vs 64% with vector search alone.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Browser["Browser (plain JS)"]
+        UI["Dashboard: sliders, live charts<br/>2D canvas / 2.5D Three.js"]
+        CHAT["Analyst tab"]
+    end
+    subgraph Server["FastAPI server"]
+        SM["SessionManager<br/>(one sim, or one per visitor)"]
+        LOOP["SimSession: 20 Hz loop<br/>LiveRun = sim + metrics + logger"]
+        AS["AnalystService<br/>(live status, which runs)"]
+    end
+    subgraph Sim["sim/ (headless, deterministic)"]
+        ENG["Simulation.step()<br/>IDM car-following, bike filtering,<br/>social-force pedestrians, box rule"]
+        SIG["SignalController<br/>min green, amber, all-red, ped phase"]
+        POL["Policies: fixed, Webster,<br/>actuated, gap-out, RL"]
+    end
+    subgraph ML["Models"]
+        RL["rl/: MaskablePPO agent<br/>(Gymnasium env)"]
+        PR["predict/: LightGBM<br/>queue in 2 min"]
+    end
+    subgraph RAG["rag/: analyst"]
+        KB["Knowledge base<br/>PDF pages + run logs as prose<br/>ChromaDB + BM25"]
+        RET["Hybrid retrieval<br/>BM25 + vectors -> RRF -> cross-encoder"]
+        LLM["gpt-oss-120b on Groq<br/>route -> answer -> grounding check"]
+    end
+    LOGS[("data/runs/<br/>metrics, events,<br/>RL decisions")]
+    UI <-- "WebSocket: frames, metrics, events / commands" --> SM
+    CHAT -- "POST /api/chat" --> AS
+    SM --> LOOP --> ENG
+    ENG --> SIG
+    POL -- "request switch" --> SIG
+    RL --> POL
+    LOOP -- "forecast" --> PR
+    LOOP -- "RunLogger" --> LOGS
+    LOGS --> KB
+    AS --> RET --> KB
+    RET --> LLM
+```
+
+The simulation knows nothing about rendering, RL or the LLM: training runs headless and fast, the
+dashboard only draws what the server streams, and every later phase reads the same run logs.
 
 ## Status
 - [x] Phase 1: headless core sim (IDM car-following, fixed-time signals, left-hand traffic, deterministic)
@@ -23,6 +79,10 @@ Work in progress. The full README (architecture diagram, results, learnings) com
 - [x] Phase 12: the analyst chat (Analyst tab): explains runs and AI decisions with timestamped citations,
       answers guideline questions with page citations, turns plain-English scenarios into settings you confirm,
       says "I don't know", and checks every number in its answers against the sources
+- [ ] Phase 13: RAG evaluation: 42 test questions + 11 scenario requests; retrieval comparison done
+      (vector 64% / hybrid 97% / hybrid + re-ranker 100%); RAGAS scores running on the free tier
+- [ ] Phase 14: polish: per-visitor sessions for a public demo, error-handling tests (173 tests), Docker image,
+      this README; deployment to Google Cloud Run prepared, not yet live
 
 ## Quick start
 ```bash
@@ -30,8 +90,16 @@ python -m venv .venv
 .venv/Scripts/activate        # Windows (use `source .venv/bin/activate` on macOS/Linux)
 pip install torch --index-url https://download.pytorch.org/whl/cpu   # CPU-only PyTorch: much smaller
 pip install -r requirements.txt
+python -m server              # dashboard at http://127.0.0.1:8000 (the trained models are in the repo)
+```
+
+The analyst also needs a free Groq API key (`GROQ_API_KEY=...` in `.env`, see `.env.example`) and the
+knowledge base: download the public-domain PDFs listed in `rag/sources.yaml` into `docs/`, then
+`python -m rag.build`.
+
+Everything else, regenerated from code:
+```bash
 python -m sim --duration 900  # headless run; logs to data/runs/<run_id>/ (use --no-log to skip)
-python -m server              # dashboard at http://127.0.0.1:8000
 python -m bench               # capacity benchmark (~70 s); results in experiments/results/benchmark/
 python -m rl.train            # train the RL signal controller (~18 min on 14 cores)
 python -m rl.evaluate         # compare it with the fixed timer and a gap-out rule on held-out seeds
@@ -41,11 +109,21 @@ python -m predict.train_predictor  # train LightGBM on them (~15 s); the dashboa
 python -m experiments         # 5 controllers x 90 random scenarios (~5 min on 14 cores; --quick to smoke-test)
 python -m rag.build           # index docs/*.pdf + data/runs/ for the analyst (first run downloads 2 small models)
 python -m rag.search "is a 120 s cycle too long?"   # try the knowledge base
-pytest -q
+python -m eval.run_rag_eval   # RAG evaluation (resumable; --until-done waits out the free tier's limits)
+pytest -q                     # 173 tests, ~3 min
 ```
 
+### Docker
+```bash
+docker build -t traffic-analyst .
+docker run -p 7860:7860 -e GROQ_API_KEY=... traffic-analyst     # http://localhost:7860
+```
+The image is the public-demo configuration (`deploy/public.yaml`): it downloads the two public-domain
+manuals (checksummed, because the analyst cites their page numbers), builds the search index and
+caches both search models at build time, and gets the API key only as an environment variable.
+
 ## Dashboard
-Press **Play** to start the shared simulation; sliders change demand, vehicle mix, pedestrians and
+Press **Play** to start the simulation; sliders change demand, vehicle mix, pedestrians and
 signal timing live. The junction opens in the **3D** view (drag to pan, wheel to zoom, Q/E or ⟲/⟳ to
 rotate, **Fit** to reset); **2D** switches to the top-down debug view. Add `?view=2d` to the URL to
 start in 2D, and press **F** for a frame-rate readout. If WebGL or the CDN is unavailable, the
@@ -270,3 +348,87 @@ every number of the answer in the sources: if one is missing, the model gets one
 anything still unsupported is shown under the answer ("Not found in the sources: …") instead of passing
 as fact. Every exchange is logged to `data/analyst/log.jsonl` (question, sources, answer, check result).
 
+## RAG evaluation
+`eval/rag_test_questions.json` holds **42 questions with ground-truth answers**, in the brief's four
+types, plus 11 scenario requests:
+
+| Type | # | Answered from | Example |
+|---|---|---|---|
+| Run | 12 | a fixed-timer evaluation run | "What was the worst queue on approach N in this run, and when?" |
+| AI decision | 12 | an RL evaluation run | "Why did the AI switch at 1:35?" |
+| Guideline | 12 | the three manuals | "What walking speed is used to time the pedestrian clearance interval?" |
+| Unanswerable | 6 | — (must say "I don't know") | "How much CO2 did the traffic emit during this run?" |
+| Scenario | 11 | — (checked against rules) | "Evening rush, 60% bikes, school crossing" |
+
+The two runs are regenerated bit-identically from a seed (`eval/runs.py` checks their fingerprints),
+and every question lists the passages a correct answer needs (a page of a manual, or a minute of a run).
+
+**Retrieval: vector vs hybrid vs hybrid + re-ranker** (the 36 run, decision and guideline questions;
+no LLM involved, so it is exact and free):
+
+| Retrieval | Needed passage found (top 5) | Mean reciprocal rank |
+|---|---|---|
+| Vector only | 64% | 0.34 |
+| Hybrid (BM25 + vectors, RRF) | 97% | 0.76 |
+| **Hybrid + cross-encoder** | **100%** | **0.86** |
+
+Vector search alone fails mostly on questions tied to a moment ("at 1:35"): embeddings barely register
+timestamps, while BM25 matches "4:05" exactly and the time-aware search puts that minute first. The
+hybrid's one miss (MUTCD p. 489, red clearance) is recovered by the re-ranker.
+
+**RAGAS** (faithfulness, answer relevancy, context precision, context recall) scores the deployed
+setup's answers (gpt-oss-120b, hybrid + re-ranker) with gpt-oss-20b as the judge. On Groq's free
+tier (~200k tokens per model per day) this takes a few days, so the run is resumable and waits out
+the limits by itself; the scores go here when it finishes. Why not RAGAS for all three retrieval
+modes: that triples the answers and judgements (~3 weeks on the free tier), and retrieval quality is
+measured exactly by the table above.
+
+## Public demo: one sim per visitor
+Locally, every browser shares one simulation. A public link can't work that way (strangers would move
+each other's sliders), so the demo configuration (`deploy/public.yaml`, loaded on top of `config.yaml`
+via `TRAFFIC_OVERLAY`) gives **each browser tab its own simulation**: at most 4 at once (a fifth visitor
+sees "demo busy" and retries), a reload reconnects to the same sim, and a sim closes 2 minutes after
+its tab, deleting its run logs. The heavy models (RL network, predictor, search models) are loaded
+once and shared. The analyst allows 10 questions per visitor per hour, to keep the free Groq quota
+for everyone, and a visitor can only ask about their own runs.
+
+Deployment target: **Google Cloud Run** (`python -m deploy.cloudrun <project-id>`): the same Docker
+image, scaled to zero when nobody visits, capped at one instance (the sessions live in its memory),
+with the Groq key in Secret Manager. Hugging Face Spaces (the brief's option) now charges for Docker
+Spaces, and Render's free tier (512 MB) can't hold PyTorch plus the search models.
+
+## Limitations
+- **One junction layout** (4 arms, 2 lanes in and out) and **simplified behaviour**: no lane changes
+  between approach lanes, no U-turns, pedestrians separated from vehicles by rules rather than forces.
+  The simulator is calibrated to be plausible, not validated against real Indian traffic counts.
+- **The RL agent** was trained on this layout only and decides on a 5 s grid, so classic actuated
+  control (2 s gap-out) still wins at low demand. Its reward ignores pedestrians, who wait longer than
+  under gap-out. Deep overload needed a hand-written 60 s max-green guard (its inputs saturate).
+- **The predictor** gets the queue level right but rounds off the signal sawtooth, and was trained only
+  on simulated runs from this junction.
+- **The analyst** depends on a free-tier LLM (~8,000 tokens a minute, so 3–7 s per answer and a
+  daily cap), only knows three manuals (two of them US), and its grounding check catches invented
+  numbers, not wrong reasoning about correct ones. The RAGAS judge is itself an LLM.
+- **The public demo** keeps sessions in one process's memory (one instance), the per-visitor question
+  limit trusts the X-Forwarded-For header, and a cold start takes ~30 s.
+
+## Key learnings
+- **Determinism pays for itself.** One seeded random generator and fixed iteration order made runs
+  bit-identical, which made paired experiments, fair side-by-side comparisons and regression tests
+  possible, and turned "flaky" bugs into reproducible ones.
+- **Make the safety layer separate from the smart layer.** The RL agent can only *request* a switch;
+  min green, amber, all-red and the pedestrian phase stay with the signal controller. A bad policy can
+  be slow, never unsafe, and the same holds for every baseline.
+- **Baselines decide whether a result means anything.** Beating a fixed timer by 27% sounds great;
+  the honest finding is a tie with classic actuated control. The experiment also exposed the agent's
+  overload lock-up, which a single demo run never showed.
+- **Test what the model sees, not what you think it sees.** Training/deployment parity tests (RL
+  observations, predictor features) caught drift, and a logged-value bug (green time read after the
+  switch) was found only by reading the logs back.
+- **Retrieval before generation.** Most analyst failures were retrieval failures: embeddings ignore
+  timestamps, so time-aware search and BM25 mattered more than prompt wording. Measuring retrieval
+  directly (no LLM) was cheaper and more exact than LLM-judged metrics.
+- **Don't trust a prompt to enforce a rule.** "Never invent numbers" is a request; the grounding check
+  is a guarantee. Likewise, relative times are computed in code, not by the model.
+- **Free tiers shape the design.** Token limits set the source budget per answer, the evaluation had
+  to be cached and resumable, and the deployment target changed when a free tier disappeared.

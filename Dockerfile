@@ -1,4 +1,4 @@
-# Traffic Analyst: the public demo image (Hugging Face Spaces, Docker SDK; any Docker host works).
+# Traffic Analyst: the public demo image (Google Cloud Run: python -m deploy.cloudrun; any Docker host works).
 #   docker build -t traffic-analyst .
 #   docker run -p 7860:7860 -e GROQ_API_KEY=... traffic-analyst      -> http://localhost:7860
 # Everything a visitor needs is baked in at build time: the trained RL agent and queue predictor
@@ -19,7 +19,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Hugging Face Spaces runs the container as user 1000; it must own the files it writes
+# Run as an unprivileged user (uid 1000) that owns the files it writes
 # (run logs, the index, the analyst log).
 RUN useradd -m -u 1000 user
 WORKDIR /app
