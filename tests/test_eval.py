@@ -107,24 +107,26 @@ def test_report_from_saved_work(tmp_path, monkeypatch):
          "expected": [{"run_id": "R", "kind": "run_window", "t": 30}]},
         {"id": "u1", "type": "unanswerable", "run_id": "R", "question": "q", "ground_truth": "idk", "expected": []},
         {"id": "s1", "type": "scenario", "question": "q", "checks": {"volume_vph": [100, 200]}}]}
-    src = {"run_id": "R", "kind": "run_window", "t_start": 0.0, "t_end": 60.0, "text": "t"}
-    for mode in ev.MODES:
-        ev.append_jsonl(ev.WORK / "answers.jsonl", {"id": "r1", "mode": mode, "type": "answer", "answer": "A [1]",
-                                                     "sources": [src], "grounding": {"unsupported": []}})
-        ev.append_jsonl(ev.WORK / "answers.jsonl", {"id": "u1", "mode": mode, "type": "answer",
-                                                     "answer": "I don't know.", "sources": []})
-        for m in ev.METRICS:
-            ev.append_jsonl(ev.WORK / "scores.jsonl", {"id": "r1", "mode": mode, "metric": m, "value": 0.8})
+    src = {"run_id": "R", "kind": "run_window", "t_start": 0.0, "t_end": 60.0, "text": "t", "citation": "c"}
+    mode = ev.ANSWER_MODE
+    ev.append_jsonl(ev.WORK / "answers.jsonl", {"id": "r1", "mode": mode, "type": "answer", "answer": "A [1]",
+                                                 "sources": [src], "grounding": {"unsupported": []}, "wall_s": 3.0})
+    ev.append_jsonl(ev.WORK / "answers.jsonl", {"id": "u1", "mode": mode, "type": "answer",
+                                                 "answer": "I don't know.", "sources": [], "wall_s": 2.0})
+    for m in ev.METRICS:
+        ev.append_jsonl(ev.WORK / "scores.jsonl", {"id": "r1", "mode": mode, "metric": m, "value": 0.8})
     ev.append_jsonl(ev.WORK / "answers.jsonl", {"id": "s1", "mode": "scenario", "type": "scenario",
                                                  "proposal": {"volume_vph": 150.0}, "changes": [{"key": "volume_vph"}]})
+    retrieval_rows = [{"id": "r1", "type": "run", "mode": m, "hit": float(m != "vector"), "rr": 0.5 if m != "vector" else 0.0,
+                       "retrieved": "c"} for m in ev.MODES]
     from sim.config import load_config
-    out = ev.stage_report(load_config(), qs)
+    out = ev.stage_report(load_config(), qs, retrieval_rows)
     md = (out / "results.md").read_text(encoding="utf-8")
     assert "**0.80**" in md and "1/1 requests fully right" in md
-    summary = list(__import__("csv").DictReader(open(out / "summary.csv", encoding="utf-8")))
-    assert float(summary[0]["hit_rate"]) == 1.0 and float(summary[0]["abstain_correct"]) == 1.0
-    assert json.loads((out / "meta.json").read_text())["missing_scores"] == 0
-    assert (out / "plot.png").is_file()
+    assert "| Vector only | 0% / 0.00 |" in md and "| Hybrid + re-ranker | 100% / 0.50 |" in md
+    meta = json.loads((out / "meta.json").read_text())
+    assert meta["missing_scores"] == 0 and meta["behaviour"]["abstain_correct"] == 1.0
+    assert (out / "plot.png").is_file() and (out / "retrieval.csv").is_file()
 
 
 def test_llm_reply_is_cacheable():

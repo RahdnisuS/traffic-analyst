@@ -158,7 +158,7 @@ class Analyst:
             else:
                 out = self._answer(question, history, route, ctx, timing)
         except LLMError as exc:
-            out = {"type": "error", "message": str(exc)}
+            out = {"type": "error", "message": str(exc), **({"detail": exc.detail} if getattr(exc, "detail", "") else {})}
         out["timing"] = {**timing, "total_s": round(time.perf_counter() - t0, 2)}
         self._log(question, out)
         return out

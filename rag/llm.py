@@ -142,8 +142,14 @@ class GroqClient:
             return LLMReply(text, model, u.get("prompt_tokens", 0), u.get("completion_tokens", 0),
                             round(time.perf_counter() - t0, 2))
         wait = last.headers.get("retry-after") if last is not None else None
-        raise RateLimited("The free-tier rate limit of the language model was reached"
+        try:  # which limit (per minute, per day, requests): kept for diagnosis
+            detail = (last.json().get("error") or {}).get("message", "") if last is not None else ""
+        except (ValueError, AttributeError):
+            detail = ""
+        exc = RateLimited("The free-tier rate limit of the language model was reached"
                           + (f"; try again in about {wait} s." if wait else "; try again in a minute."))
+        exc.detail = detail
+        raise exc
 
     def chat_json(self, messages: list[dict], **kw) -> tuple[dict, LLMReply]:
         """A JSON object reply. JSON mode guarantees syntax; the caller validates the content."""

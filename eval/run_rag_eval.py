@@ -1,30 +1,36 @@
 """RAG evaluation: ``python -m eval.run_rag_eval`` (resumable; run it again to continue).
 
-WHAT is measured, per retrieval setup (vector only / hybrid / hybrid + re-ranker):
-  RAGAS (LLM-judged, 0..1, higher is better), on the 36 answerable questions:
-    faithfulness       share of the answer's claims that the retrieved contexts support
-    answer_relevancy   how well the answer addresses the question (questions generated back
-                       from the answer, compared with the real one by embedding similarity)
-    context_precision  are the contexts that matter ranked near the top? (judged against the
-                       ground truth)
-    context_recall     share of the ground truth's claims found in the contexts
-  Without an LLM (exact, cheap, reproducible):
-    hit rate / MRR     did the expected chunk (document page, or run window at the asked time)
-                       come back, and at what rank
-    abstention         on the 6 unanswerable questions, did it say "I don't know"? and on the
-                       answerable ones, did it wrongly refuse?
-    grounding flags    answers where the grounding check found a number not in the sources
-  Scenarios (11 requests): rule checks on the proposed settings (e.g. "60% bikes" -> bike share
-  58-62%, "turn on the AI" -> controller rl and nothing else changed, "5 s green" -> rejected or
-  >= the 7 s minimum green).
+WHAT is measured:
+  1. RETRIEVAL, all three setups (vector only / hybrid BM25 + vector with RRF / hybrid + cross-encoder
+     re-ranker), no LLM: for each of the 36 answerable questions, the analyst's own retrieval code
+     (``Analyst._retrieve``, same filters, same k, same extra run summary) is run with the question as
+     the query, and scored against the chunks a good retrieval must return (document page, or the
+     run window covering the asked time):
+       hit rate   share of questions whose expected chunk is among the sources
+       MRR        mean reciprocal rank of the first expected chunk (1 = first, 0.5 = second, ...)
+  2. ANSWERS, the setup the dashboard uses (hybrid + re-ranker), judged by RAGAS (0..1, higher is better):
+       faithfulness       share of the answer's claims supported by the retrieved contexts
+       answer_relevancy   how well the answer addresses the question (questions generated back from
+                          the answer, compared with the real one by embedding similarity)
+       context_precision  are the contexts that matter ranked near the top? (judged vs ground truth)
+       context_recall     share of the ground truth's claims found in the contexts
+     plus, without an LLM: abstention on the 6 unanswerable questions (does it say "I don't know"?),
+     false refusals on the answerable ones, and answers where the grounding check flagged a number.
+  3. SCENARIOS (11 requests): rule checks on the proposed settings ("60% bikes" -> bike share 58-62%,
+     "turn on the AI" -> controller rl and nothing else, "5 s green" -> rejected or >= the 7 s minimum).
 
-HOW it stays within the Groq free tier (per model: 1,000 requests/day, 8,000 tokens/minute):
+WHY RAGAS judges only one setup (user's choice, Phase 13): the Groq free tier gives each model about
+200,000 tokens a DAY (on top of 1,000 requests/day and 8,000 tokens/minute). Answering 42 questions in
+3 setups and judging 108 answers (~14k judge tokens each) would have taken ~9 days of daily re-runs.
+The setups differ only in RETRIEVAL, which part 1 measures exactly and for free; RAGAS then measures
+the answers of the deployed setup.
+
+HOW it stays within the free tier:
   * every LLM call is cached on disk (eval/work/, gitignored), keyed by the exact request, so a run
-    stopped by the daily cap resumes where it stopped and nothing is paid for twice;
+    stopped by a daily cap resumes where it stopped and nothing is paid for twice;
   * on a per-minute limit the clients WAIT and retry the same model (no fallback: every answer must
     come from the analyst's model, every score from the judge);
-  * answers come from gpt-oss-120b (the analyst), judging from gpt-oss-20b: a different (smaller)
-    model with its own daily budget (see JUDGE_MODEL for why not qwen).
+  * answers come from gpt-oss-120b (the analyst), judging from gpt-oss-20b (see JUDGE_MODEL).
 
 Stages: ``--stage answers`` (generate), ``judge`` (RAGAS), ``report``, or ``all`` (default).
 """
@@ -51,6 +57,7 @@ EVAL_DIR = PROJECT_ROOT / "eval"
 WORK = EVAL_DIR / "work"
 QUESTIONS = EVAL_DIR / "rag_test_questions.json"
 MODES = ("vector", "hybrid", "hybrid_rerank")
+ANSWER_MODE = "hybrid_rerank"  # the setup the dashboard uses: answered and judged by RAGAS
 MODE_LABEL = {"vector": "Vector only", "hybrid": "Hybrid (BM25 + vector, RRF)", "hybrid_rerank": "Hybrid + re-ranker"}
 RAG_TYPES = ("run", "decision", "guideline")
 METRICS = ("faithfulness", "answer_relevancy", "context_precision", "context_recall")
@@ -64,10 +71,12 @@ ABSTAIN = re.compile(r"\b(?:i\s+(?:do\s+not|don['’]t)\s+know|not\s+(?:recorded
                      r"no\s+(?:information|data|record)|(?:sources|logs)\s+(?:do\s+not|don['’]t)\s+(?:contain|include|"
                      r"record|mention))", re.I)
 STRICT_IDK = re.compile(r"\bi\s+(?:do\s+not|don['’]t)\s+know\b", re.I)
+SETTINGS = {"volume_vph": 400.0, "vehicle_mix": {"auto": 15.0, "bike": 45.0, "bus": 5.0, "car": 35.0},
+            "ped_rate_ph": 300.0, "aggressiveness": 0.5, "green_s": 25.0, "controller": "fixed"}
 
 
 class StopForToday(Exception):
-    """The daily rate limit is exhausted: progress is saved, run the command again later."""
+    """A daily rate limit is exhausted: progress is saved, run the command again later."""
 
 
 # ---------------------------------------------------------------------- storage
@@ -87,7 +96,6 @@ def load_questions() -> dict:
     return json.loads(QUESTIONS.read_text(encoding="utf-8"))
 
 
-# ---------------------------------------------------------------------- stage 1: answers
 def check_runs(cfg, qs: dict) -> None:
     from eval.runs import make_runs
     fps = make_runs(cfg)
@@ -97,41 +105,48 @@ def check_runs(cfg, qs: dict) -> None:
                          "The simulator changed: regenerate the runs and review the ground truths.")
 
 
-def stage_answers(cfg, qs: dict, limit: int | None) -> None:
-    from rag.analyst import Analyst, AnalystContext
+def knowledge(cfg, qs: dict):
+    """The knowledge base (with the evaluation runs indexed) and its retriever."""
     from rag.build import KnowledgeBase
-    from rag.llm import GroqClient
     from rag.retrieval import Retriever
-
-    check_runs(cfg, qs)
     kb = KnowledgeBase(cfg)
     for rid in qs["runs"]:
         kb.index_run(cfg.runs_path() / rid)
-    retriever = Retriever.from_config(cfg, store=kb.store, embedder=kb.embedder)
+    return kb, Retriever.from_config(cfg, store=kb.store, embedder=kb.embedder)
+
+
+def context_for(cfg, q: dict):
+    from rag.analyst import AnalystContext
+    return AnalystContext(run_ids=[q["run_id"]] if q.get("run_id") else [], settings=SETTINGS,
+                          limits={"volume_vph": [0, 1500], "green_s": [cfg.signals.min_green_s, 90],
+                                  "ped_rate_ph": [0, 1200]},
+                          capacity="1,790 veh/h in total (about 450 veh/h per approach) with the 25 s fixed timer")
+
+
+# ---------------------------------------------------------------------- stage 1: answers
+def stage_answers(cfg, qs: dict, limit: int | None) -> None:
+    from rag.analyst import Analyst
+    from rag.llm import GroqClient
+
+    check_runs(cfg, qs)
+    kb, retriever = knowledge(cfg, qs)
     # No fallback model, wait out per-minute limits, cache every reply.
     llm = GroqClient(cfg.analyst.model, None, cache_dir=WORK / "llm_cache", wait_on_limit_s=90)
     done = {(r["id"], r["mode"]) for r in load_jsonl(WORK / "answers.jsonl")}
-    items = [q for q in qs["questions"] if q["type"] != "scenario"]
-    scen = [q for q in qs["questions"] if q["type"] == "scenario"]
-    todo = [(q, m) for q in items for m in MODES if (q["id"], m) not in done]
-    todo += [(q, "scenario") for q in scen if (q["id"], "scenario") not in done]
+    todo = [(q, ANSWER_MODE) for q in qs["questions"] if q["type"] != "scenario" and (q["id"], ANSWER_MODE) not in done]
+    todo += [(q, "scenario") for q in qs["questions"] if q["type"] == "scenario" and (q["id"], "scenario") not in done]
     if limit:
         todo = todo[:limit]
-    print(f"answers: {len(done)} done, {len(todo)} to go")
-    settings = {"volume_vph": 400.0, "vehicle_mix": {"auto": 15.0, "bike": 45.0, "bus": 5.0, "car": 35.0},
-                "ped_rate_ph": 300.0, "aggressiveness": 0.5, "green_s": 25.0, "controller": "fixed"}
-    limits = {"volume_vph": [0, 1500], "green_s": [cfg.signals.min_green_s, 90], "ped_rate_ph": [0, 1200]}
+    print(f"answers: {len(done)} stored, {len(todo)} to go", flush=True)
     for n, (q, mode) in enumerate(todo, 1):
-        analyst = Analyst(cfg, retriever, llm, kb, retrieval_mode=mode if mode != "scenario" else "hybrid_rerank")
-        ctx = AnalystContext(run_ids=[q["run_id"]] if q.get("run_id") else [], settings=settings, limits=limits,
-                             capacity="1,790 veh/h in total (about 450 veh/h per approach) with the 25 s fixed timer")
+        analyst = Analyst(cfg, retriever, llm, kb, retrieval_mode=ANSWER_MODE)
         t0 = time.perf_counter()
-        out = analyst.ask(q["question"], [], ctx)
+        out = analyst.ask(q["question"], [], context_for(cfg, q))
         if out.get("type") == "error" and "rate limit" in out.get("message", ""):
-            raise StopForToday(out["message"])
+            raise StopForToday(f"{out['message']} [{out.get('detail', '')}]")
         append_jsonl(WORK / "answers.jsonl", {"id": q["id"], "mode": mode, "type": q["type"],
                                               "wall_s": round(time.perf_counter() - t0, 2), **out})
-        print(f"  [{n}/{len(todo)}] {q['id']:8s} {mode:14s} {out.get('type')} {out.get('intent', '')}")
+        print(f"  [{n}/{len(todo)}] {q['id']:8s} {mode:14s} {out.get('type')} {out.get('intent', '')}", flush=True)
 
 
 # ---------------------------------------------------------------------- stage 2: judge
@@ -168,20 +183,21 @@ async def score_one(metrics: dict, name: str, q: dict, a: dict) -> float:
         r = await m.ascore(user_input=q["question"], reference=q["ground_truth"], retrieved_contexts=ctxs)
     else:
         r = await m.ascore(user_input=q["question"], retrieved_contexts=ctxs, reference=q["ground_truth"])
-    return float(r.value) if r.value is not None and not (isinstance(r.value, float) and math.isnan(r.value)) else float("nan")
+    v = r.value
+    return float(v) if v is not None and not (isinstance(v, float) and math.isnan(v)) else float("nan")
 
 
 def stage_judge(qs: dict, limit: int | None) -> None:
     from openai import RateLimitError
 
     by_id = {q["id"]: q for q in qs["questions"]}
-    answers = [a for a in load_jsonl(WORK / "answers.jsonl") if a.get("type") == "answer" and a["mode"] in MODES
+    answers = [a for a in load_jsonl(WORK / "answers.jsonl") if a.get("type") == "answer" and a["mode"] == ANSWER_MODE
                and by_id[a["id"]]["type"] in RAG_TYPES]
     done = {(s["id"], s["mode"], s["metric"]) for s in load_jsonl(WORK / "scores.jsonl")}
     todo = [(a, m) for a in answers for m in METRICS if (a["id"], a["mode"], m) not in done]
     if limit:
         todo = todo[:limit]
-    print(f"judge: {len(done)} scores done, {len(todo)} to go (judge {JUDGE_MODEL})")
+    print(f"judge: {len(done)} scores stored, {len(todo)} to go (judge {JUDGE_MODEL})", flush=True)
     if not todo:
         return
     metrics = make_judge()
@@ -190,20 +206,44 @@ def stage_judge(qs: dict, limit: int | None) -> None:
         for n, (a, m) in enumerate(todo, 1):
             t0 = time.perf_counter()
             try:
-                v = await score_one(metrics, m, by_id[a["id"]], a)
+                v, err = await score_one(metrics, m, by_id[a["id"]], a), None
             except RateLimitError as exc:
-                raise StopForToday(f"judge rate limit: {exc}") from exc
+                raise StopForToday(f"judge rate limit: {str(exc)[:300]}") from exc
             except Exception as exc:  # a malformed judge reply: record it, don't stop the run
+                if "rate_limit" in str(exc) or "429" in str(exc):
+                    raise StopForToday(f"judge rate limit: {str(exc)[:300]}") from exc
                 v, err = float("nan"), f"{type(exc).__name__}: {str(exc)[:200]}"
-            else:
-                err = None
             append_jsonl(WORK / "scores.jsonl", {"id": a["id"], "mode": a["mode"], "metric": m, "value": v,
                                                  "error": err, "s": round(time.perf_counter() - t0, 2)})
-            print(f"  [{n}/{len(todo)}] {a['id']:8s} {a['mode']:14s} {m:18s} {v:.3f}" + (f"  ({err})" if err else ""))
+            print(f"  [{n}/{len(todo)}] {a['id']:8s} {m:18s} {v:.3f}" + (f"  ({err})" if err else ""), flush=True)
     asyncio.run(run())
 
 
-# ---------------------------------------------------------------------- stage 3: report
+# ---------------------------------------------------------------------- retrieval (no LLM)
+INTENT_OF = {"run": "run", "decision": "decision", "guideline": "guideline"}
+
+
+def retrieval_eval(cfg, qs: dict) -> list[dict]:
+    """Every setup's retrieval for every answerable question, through the analyst's own code
+    (``Analyst._retrieve``) with the question as the query: no LLM, so it is exact, free and
+    reproducible. The route a real question would get is the question's type."""
+    from rag.analyst import Analyst
+
+    kb, retriever = knowledge(cfg, qs)
+    rows = []
+    for mode in MODES:
+        analyst = Analyst(cfg, retriever, llm=None, kb=kb, retrieval_mode=mode)
+        for q in qs["questions"]:
+            if q["type"] not in RAG_TYPES:
+                continue
+            route = {"intent": INTENT_OF[q["type"]], "query": q["question"], "run_ref": None}
+            sources = analyst._retrieve(route, context_for(cfg, q))
+            hit, rr = retrieval_scores(q, {"sources": sources})
+            rows.append({"id": q["id"], "type": q["type"], "mode": mode, "hit": hit, "rr": rr,
+                         "retrieved": " | ".join(s["citation"] for s in sources)})
+    return rows
+
+
 def source_matches(src: dict, exp: dict) -> bool:
     if "doc_id" in exp:
         return src.get("doc_id") == exp["doc_id"] and str(src.get("page_label")) == str(exp["page_label"])
@@ -223,6 +263,7 @@ def retrieval_scores(q: dict, a: dict) -> tuple[float, float]:
     return 0.0, 0.0
 
 
+# ---------------------------------------------------------------------- scenarios
 def check_scenario(q: dict, a: dict) -> tuple[int, int, list[str]]:
     """(checks passed, checks, failures) for one scenario answer."""
     c = q["checks"]
@@ -242,10 +283,7 @@ def check_scenario(q: dict, a: dict) -> tuple[int, int, list[str]]:
             ok = changed <= set(want)
             label = f"only {want} changed (changed: {sorted(changed)})"
         else:
-            if key.startswith("vehicle_mix."):
-                val = (p.get("vehicle_mix") or {}).get(key.split(".", 1)[1])
-            else:
-                val = p.get(key)
+            val = (p.get("vehicle_mix") or {}).get(key.split(".", 1)[1]) if key.startswith("vehicle_mix.") else p.get(key)
             if isinstance(want, list) and len(want) == 2 and all(isinstance(x, (int, float)) for x in want):
                 ok = val is not None and want[0] - 1e-6 <= float(val) <= want[1] + 1e-6
             elif isinstance(want, list):
@@ -260,6 +298,7 @@ def check_scenario(q: dict, a: dict) -> tuple[int, int, list[str]]:
     return passed, total, fails
 
 
+# ---------------------------------------------------------------------- report
 def mean_ci(vals: list[float], seed: int = 0) -> tuple[float, float, float, int]:
     v = np.array([x for x in vals if x is not None and not math.isnan(x)])
     if not len(v):
@@ -270,65 +309,61 @@ def mean_ci(vals: list[float], seed: int = 0) -> tuple[float, float, float, int]
     return float(v.mean()), float(lo), float(hi), len(v)
 
 
-def stage_report(cfg, qs: dict) -> Path:
+def stage_report(cfg, qs: dict, retrieval_rows: list[dict] | None = None) -> Path:
     from sim.logger import _git_commit
 
-    by_id = {q["id"]: q for q in qs["questions"]}
     answers = load_jsonl(WORK / "answers.jsonl")
     A = {(a["id"], a["mode"]): a for a in answers}
-    S = {}
-    for s in load_jsonl(WORK / "scores.jsonl"):
-        S[(s["id"], s["mode"], s["metric"])] = s["value"]
+    S = {(s["id"], s["mode"], s["metric"]): s["value"] for s in load_jsonl(WORK / "scores.jsonl")}
+    retrieval_rows = retrieval_eval(cfg, qs) if retrieval_rows is None else retrieval_rows
     now = datetime.now(timezone.utc)
     out = EVAL_DIR / "results" / f"{now:%Y%m%d-%H%M%S}"
     out.mkdir(parents=True, exist_ok=True)
 
-    rag_qs = [q for q in qs["questions"] if q["type"] in RAG_TYPES]
-    idk_qs = [q for q in qs["questions"] if q["type"] == "unanswerable"]
-    scn_qs = [q for q in qs["questions"] if q["type"] == "scenario"]
-    rows, summary = [], []
-    for q in rag_qs + idk_qs:
-        for mode in MODES:
-            a = A.get((q["id"], mode))
-            if not a:
-                continue
-            hit, rr = retrieval_scores(q, a) if q["type"] in RAG_TYPES else (None, None)
-            g = a.get("grounding") or {}
-            rows.append({"id": q["id"], "type": q["type"], "mode": mode, "answer_type": a.get("type"),
-                         **{m: S.get((q["id"], mode, m)) for m in METRICS}, "hit": hit, "rr": rr,
-                         "abstained": bool(ABSTAIN.search(a.get("answer") or "")),
-                         "said_idk": bool(STRICT_IDK.search(a.get("answer") or "")),
-                         "unsupported_numbers": len(g.get("unsupported") or []),
-                         "n_sources": len(a.get("sources") or []), "wall_s": a.get("wall_s"),
-                         "answer": (a.get("answer") or a.get("message") or "").replace("\n", " ")})
-    for mode in MODES:
-        mr = [r for r in rows if r["mode"] == mode]
-        ans = [r for r in mr if r["type"] in RAG_TYPES]
-        idk = [r for r in mr if r["type"] == "unanswerable"]
-        line = {"mode": mode, "answered": len(ans)}
-        for m in METRICS:
-            mu, lo, hi, n = mean_ci([r[m] for r in ans])
-            line.update({m: mu, f"{m}_lo": lo, f"{m}_hi": hi, f"{m}_n": n})
-        line["hit_rate"] = statistics.fmean(r["hit"] for r in ans) if ans else float("nan")
-        line["mrr"] = statistics.fmean(r["rr"] for r in ans) if ans else float("nan")
-        line["abstain_correct"] = sum(r["abstained"] for r in idk) / len(idk) if idk else float("nan")
-        line["false_idk"] = sum(r["said_idk"] for r in ans) / len(ans) if ans else float("nan")
-        line["grounding_flagged"] = sum(r["unsupported_numbers"] > 0 for r in ans) / len(ans) if ans else float("nan")
-        for t in RAG_TYPES:
-            tr = [r for r in ans if r["type"] == t]
-            for m in METRICS:
-                line[f"{t}:{m}"] = mean_ci([r[m] for r in tr])[0]
-            line[f"{t}:hit_rate"] = statistics.fmean(r["hit"] for r in tr) if tr else float("nan")
-        summary.append(line)
-
-    scn_rows = []
-    for q in scn_qs:
-        a = A.get((q["id"], "scenario"))
+    rows = []
+    for q in qs["questions"]:
+        if q["type"] not in (*RAG_TYPES, "unanswerable"):
+            continue
+        a = A.get((q["id"], ANSWER_MODE))
         if not a:
             continue
-        p, t, fails = check_scenario(q, a)
-        scn_rows.append({"id": q["id"], "request": q["question"], "passed": p, "checks": t, "ok": p == t,
-                         "failures": "; ".join(fails), "proposal": json.dumps(a.get("proposal"))})
+        g = a.get("grounding") or {}
+        text = a.get("answer") or ""
+        rows.append({"id": q["id"], "type": q["type"], "answer_type": a.get("type"),
+                     **{m: S.get((q["id"], ANSWER_MODE, m)) for m in METRICS},
+                     "abstained": bool(ABSTAIN.search(text)), "said_idk": bool(STRICT_IDK.search(text)),
+                     "unsupported_numbers": len(g.get("unsupported") or []), "repaired": bool(g.get("repaired")),
+                     "n_sources": len(a.get("sources") or []), "wall_s": a.get("wall_s"),
+                     "question": q["question"], "answer": (text or a.get("message") or "").replace("\n", " ")})
+    ans = [r for r in rows if r["type"] in RAG_TYPES]
+    idk = [r for r in rows if r["type"] == "unanswerable"]
+
+    ragas = {}
+    for group in ("all", *RAG_TYPES):
+        rs = ans if group == "all" else [r for r in ans if r["type"] == group]
+        ragas[group] = {m: mean_ci([r[m] for r in rs]) for m in METRICS}
+    behaviour = {
+        "answered": len(ans), "unanswerable": len(idk),
+        "abstain_correct": sum(r["abstained"] for r in idk) / len(idk) if idk else float("nan"),
+        "false_idk": sum(r["said_idk"] for r in ans) / len(ans) if ans else float("nan"),
+        "grounding_flagged": sum(r["unsupported_numbers"] > 0 for r in ans) / len(ans) if ans else float("nan"),
+        "repaired": sum(r["repaired"] for r in ans) / len(ans) if ans else float("nan"),
+        "median_wall_s": statistics.median([r["wall_s"] for r in rows if r["wall_s"]]) if rows else float("nan"),
+    }
+    retrieval = {}
+    for mode in MODES:
+        for group in ("all", *RAG_TYPES):
+            rs = [r for r in retrieval_rows if r["mode"] == mode and (group == "all" or r["type"] == group)]
+            retrieval[(mode, group)] = (statistics.fmean(r["hit"] for r in rs) if rs else float("nan"),
+                                        statistics.fmean(r["rr"] for r in rs) if rs else float("nan"), len(rs))
+
+    scn = []
+    for q in qs["questions"]:
+        if q["type"] != "scenario" or (q["id"], "scenario") not in A:
+            continue
+        p, t, fails = check_scenario(q, A[(q["id"], "scenario")])
+        scn.append({"id": q["id"], "request": q["question"], "passed": p, "checks": t, "ok": p == t,
+                    "failures": "; ".join(fails), "proposal": json.dumps(A[(q["id"], "scenario")].get("proposal"))})
 
     def write_csv(name, data):
         if data:
@@ -336,19 +371,23 @@ def stage_report(cfg, qs: dict) -> Path:
                 w = csv.DictWriter(fh, fieldnames=list(data[0]))
                 w.writeheader()
                 w.writerows(data)
-    write_csv("per_question.csv", rows)
-    write_csv("summary.csv", summary)
-    write_csv("scenarios.csv", scn_rows)
+    write_csv("answers.csv", rows)
+    write_csv("retrieval.csv", retrieval_rows)
+    write_csv("scenarios.csv", scn)
+    write_csv("summary.csv", [{"group": g, "metric": m, "mean": v[0], "ci_lo": v[1], "ci_hi": v[2], "n": v[3]}
+                              for g, d in ragas.items() for m, v in d.items()]
+              + [{"group": f"retrieval:{mode}:{g}", "metric": k, "mean": val, "ci_lo": "", "ci_hi": "", "n": n}
+                 for (mode, g), (hit, mrr, n) in retrieval.items() for k, val in (("hit_rate", hit), ("mrr", mrr))])
     meta = {"created_at": now.isoformat(timespec="seconds"), "git_commit": _git_commit(),
-            "analyst_model": cfg.analyst.model, "judge_model": JUDGE_MODEL, "embedding_model": cfg.rag.embedding_model,
-            "reranker_model": cfg.rag.reranker_model, "questions": {t: sum(q["type"] == t for q in qs["questions"])
-                                                                   for t in (*RAG_TYPES, "unanswerable", "scenario")},
-            "answers": len(answers), "scores": len(S),
-            "missing_scores": sum(1 for r in rows if r["type"] in RAG_TYPES for m in METRICS if r[m] is None),
-            "runs": qs["runs"]}
+            "analyst_model": cfg.analyst.model, "judge_model": JUDGE_MODEL, "answer_mode": ANSWER_MODE,
+            "embedding_model": cfg.rag.embedding_model, "reranker_model": cfg.rag.reranker_model,
+            "questions": {t: sum(q["type"] == t for q in qs["questions"]) for t in (*RAG_TYPES, "unanswerable", "scenario")},
+            "answers": len(rows), "scores": sum(1 for k in S if k[1] == ANSWER_MODE),
+            "missing_scores": sum(1 for r in ans for m in METRICS if r[m] is None or (isinstance(r[m], float) and math.isnan(r[m]))),
+            "behaviour": behaviour, "runs": qs["runs"]}
     (out / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    plot(out, summary)
-    (out / "results.md").write_text(render(summary, scn_rows, meta), encoding="utf-8")
+    plot(out, ragas, retrieval)
+    (out / "results.md").write_text(render(ragas, behaviour, retrieval, scn, meta), encoding="utf-8")
     return out
 
 
@@ -356,89 +395,119 @@ def _f(x, d=2):
     return "–" if x is None or (isinstance(x, float) and math.isnan(x)) else f"{x:.{d}f}"
 
 
-def render(summary: list[dict], scn: list[dict], meta: dict) -> str:
-    L = ["# RAG evaluation: vector vs hybrid vs hybrid + re-ranker", "",
-         f"{meta['created_at']}, commit `{meta['git_commit']}`. Answers by `{meta['analyst_model']}`, judged by "
-         f"`{meta['judge_model']}` (RAGAS 0.4); retrieval: `{meta['embedding_model']}` + BM25, re-ranker "
-         f"`{meta['reranker_model']}`. Questions: {meta['questions']}."
-         + (f" **{meta['missing_scores']} scores missing** (judge errors or not yet run)." if meta["missing_scores"] else ""), "",
-         "## RAGAS (answerable questions; mean, 95% bootstrap CI)", "",
-         "| Retrieval | Faithfulness | Answer relevancy | Context precision | Context recall |", "|---|---|---|---|---|"]
-    for s in summary:
-        cells = [f"**{_f(s[m])}** [{_f(s[f'{m}_lo'])}, {_f(s[f'{m}_hi'])}]" for m in METRICS]
-        L.append(f"| {MODE_LABEL[s['mode']]} | " + " | ".join(cells) + " |")
-    L += ["", "## Retrieval and behaviour (no LLM judge)", "",
-          "| Retrieval | Expected chunk retrieved | MRR | Says \"I don't know\" when it should | Wrongly says it | Answers with an unverified number |",
-          "|---|---|---|---|---|---|"]
-    for s in summary:
-        L.append(f"| {MODE_LABEL[s['mode']]} | {_f(100 * s['hit_rate'], 0)}% | {_f(s['mrr'])} | "
-                 f"{_f(100 * s['abstain_correct'], 0)}% | {_f(100 * s['false_idk'], 0)}% | {_f(100 * s['grounding_flagged'], 0)}% |")
-    L += ["", "## By question type", "",
-          "| Type | Retrieval | Faithfulness | Answer relevancy | Context precision | Context recall | Expected chunk retrieved |",
-          "|---|---|---|---|---|---|---|"]
-    for t in RAG_TYPES:
-        for s in summary:
-            L.append(f"| {t} | {MODE_LABEL[s['mode']]} | " + " | ".join(_f(s[f'{t}:{m}']) for m in METRICS)
-                     + f" | {_f(100 * s[f'{t}:hit_rate'], 0)}% |")
+def _pct(x):
+    return "–" if x is None or (isinstance(x, float) and math.isnan(x)) else f"{100 * x:.0f}%"
+
+
+def render(ragas: dict, beh: dict, retrieval: dict, scn: list[dict], meta: dict) -> str:
+    q = meta["questions"]
+    L = ["# RAG evaluation", "",
+         f"{meta['created_at']}, commit `{meta['git_commit']}`. Answers by `{meta['analyst_model']}` with "
+         f"{MODE_LABEL[meta['answer_mode']].lower()} retrieval, judged by `{meta['judge_model']}` (RAGAS 0.4). "
+         f"Retrieval: `{meta['embedding_model']}` + BM25, re-ranker `{meta['reranker_model']}`. "
+         f"Questions: {q['run']} about runs, {q['decision']} about AI decisions, {q['guideline']} about guidelines, "
+         f"{q['unanswerable']} unanswerable, {q['scenario']} scenario requests."
+         + (f" **{meta['missing_scores']} RAGAS scores missing** (judge errors or not yet run)." if meta["missing_scores"] else ""),
+         "", "## Retrieval: vector vs hybrid vs hybrid + re-ranker (no LLM)", "",
+         "Did the chunk a correct answer needs (the document page, or the run window at the time asked about) come "
+         "back among the sources the analyst gets, and at what rank? Same code, filters and k as the analyst.", "",
+         "| Retrieval | All (hit rate / MRR) | Runs | AI decisions | Guidelines |", "|---|---|---|---|---|"]
+    for mode in MODES:
+        cells = [f"{_pct(retrieval[(mode, g)][0])} / {_f(retrieval[(mode, g)][1])}" for g in ("all", *RAG_TYPES)]
+        L.append(f"| {MODE_LABEL[mode]} | " + " | ".join(cells) + " |")
+    L += ["", f"## Answers (RAGAS, {MODE_LABEL[meta['answer_mode']].lower()}; mean, 95% bootstrap CI)", "",
+          "| Questions | n | Faithfulness | Answer relevancy | Context precision | Context recall |", "|---|---|---|---|---|---|"]
+    for g in ("all", *RAG_TYPES):
+        d = ragas[g]
+        n = max(v[3] for v in d.values())
+        L.append(f"| {'All answerable' if g == 'all' else g} | {n} | "
+                 + " | ".join(f"**{_f(d[m][0])}** [{_f(d[m][1])}, {_f(d[m][2])}]" for m in METRICS) + " |")
+    L += ["", "## Behaviour (no LLM judge)", "",
+          f"- Says \"I don't know\" (or that the data isn't recorded) on the unanswerable questions: **{_pct(beh['abstain_correct'])}** of {beh['unanswerable']}",
+          f"- Wrongly says \"I don't know\" on answerable questions: **{_pct(beh['false_idk'])}** of {beh['answered']}",
+          f"- Answers where the grounding check still found a number not in the sources: **{_pct(beh['grounding_flagged'])}** "
+          f"(repaired by the second pass: {_pct(beh['repaired'])})",
+          f"- Median time per answer: {_f(beh['median_wall_s'], 1)} s (Groq free tier, incl. waits for its per-minute limit)"]
     if scn:
         ok = sum(r["ok"] for r in scn)
         checks = sum(r["passed"] for r in scn), sum(r["checks"] for r in scn)
         L += ["", f"## Scenarios: {ok}/{len(scn)} requests fully right ({checks[0]}/{checks[1]} checks)", "",
               "| Request | Checks | Failures |", "|---|---|---|"]
         L += [f"| {r['request']} | {r['passed']}/{r['checks']} | {r['failures'] or '–'} |" for r in scn]
-    L += ["", "![results](plot.png)", ""]
+    L += ["", "![results](plot.png)", "",
+          "Notes: the judge (gpt-oss-20b) is from the same model family as the analyst (gpt-oss-120b), so some "
+          "self-preference bias is possible; the retrieval and behaviour numbers need no judge. RAGAS judged only "
+          "the deployed setup because of the Groq free tier's daily token cap (see eval/run_rag_eval.py).", ""]
     return "\n".join(L)
 
 
-def plot(out: Path, summary: list[dict]) -> None:
+def plot(out: Path, ragas: dict, retrieval: dict) -> None:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     ink, muted, grid = "#2b2a27", "#6b6a64", "#e6e4de"
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(12, 4.2), gridspec_kw={"width_ratios": [1.1, 1]})
+    for ax in (a1, a2):
+        ax.spines[["top", "right"]].set_visible(False)
+        for s_ in ("left", "bottom"):
+            ax.spines[s_].set_color(muted)
+        ax.tick_params(colors=muted)
+        ax.yaxis.grid(True, color=grid)
+        ax.set_axisbelow(True)
+        ax.set_ylim(0, 1.05)
+    groups = ("all", *RAG_TYPES)
     colors = {"vector": "#c9c7c0", "hybrid": "#8a8983", "hybrid_rerank": "#1f63b8"}
-    fig, ax = plt.subplots(figsize=(10, 4.2))
-    ax.spines[["top", "right"]].set_visible(False)
-    for s_ in ("left", "bottom"):
-        ax.spines[s_].set_color(muted)
-    ax.tick_params(colors=muted)
-    ax.yaxis.grid(True, color=grid)
-    ax.set_axisbelow(True)
-    x = np.arange(len(METRICS))
+    x = np.arange(len(groups))
     w = 0.26
-    for i, s in enumerate(summary):
-        mu = [s[m] for m in METRICS]
-        err = [[max(0, s[m] - s[f"{m}_lo"]) for m in METRICS], [max(0, s[f"{m}_hi"] - s[m]) for m in METRICS]]
-        ax.bar(x + (i - 1) * w, mu, w - 0.02, yerr=err, color=colors[s["mode"]], label=MODE_LABEL[s["mode"]],
-               error_kw={"elinewidth": 1, "capsize": 2, "ecolor": muted})
-    ax.set_xticks(x, [m.replace("_", " ") for m in METRICS])
-    ax.set_ylim(0, 1.05)
-    ax.set_title("RAGAS scores by retrieval setup (mean, 95% CI)", color=ink, fontsize=11, loc="left")
-    ax.legend(frameon=False, fontsize=8, labelcolor=ink, loc="lower right")
+    for i, mode in enumerate(MODES):
+        a1.bar(x + (i - 1) * w, [retrieval[(mode, g)][0] for g in groups], w - 0.02, color=colors[mode], label=MODE_LABEL[mode])
+    a1.set_xticks(x, ["all", "runs", "AI decisions", "guidelines"])
+    a1.set_title("Expected chunk retrieved (hit rate), by setup", color=ink, fontsize=11, loc="left")
+    a1.legend(frameon=False, fontsize=8, labelcolor=ink, loc="lower left")
+    d = ragas["all"]
+    mu = [d[m][0] for m in METRICS]
+    err = [[max(0, d[m][0] - d[m][1]) if not math.isnan(d[m][0]) else 0 for m in METRICS],
+           [max(0, d[m][2] - d[m][0]) if not math.isnan(d[m][0]) else 0 for m in METRICS]]
+    a2.bar(np.arange(len(METRICS)), [0 if math.isnan(v) else v for v in mu], 0.6, yerr=err, color="#1f63b8",
+           error_kw={"elinewidth": 1, "capsize": 3, "ecolor": muted})
+    a2.set_xticks(np.arange(len(METRICS)), [m.replace("_", " ") for m in METRICS])
+    a2.set_title("RAGAS, hybrid + re-ranker (mean, 95% CI)", color=ink, fontsize=11, loc="left")
     fig.tight_layout()
     fig.savefig(out / "plot.png", dpi=130)
     plt.close(fig)
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Evaluate the analyst (RAGAS + retrieval metrics). Resumable.")
+    ap = argparse.ArgumentParser(description="Evaluate the analyst (retrieval metrics + RAGAS). Resumable.")
     ap.add_argument("--stage", choices=["answers", "judge", "report", "all"], default="all")
     ap.add_argument("--limit", type=int, default=None, help="only this many new items per stage (smoke test)")
+    ap.add_argument("--until-done", action="store_true",
+                    help="on a daily rate limit, wait --retry-min minutes and continue, until everything is done")
+    ap.add_argument("--retry-min", type=float, default=15.0)
     args = ap.parse_args()
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     cfg = load_config()
     qs = load_questions()
-    try:
-        if args.stage in ("answers", "all"):
-            stage_answers(cfg, qs, args.limit)
-        if args.stage in ("judge", "all"):
-            stage_judge(qs, args.limit)
-    except StopForToday as exc:
-        print(f"\nStopped: {exc}\nProgress is saved in {WORK}. Run the same command again later to continue.")
-        if args.stage == "all":
-            print(f"report so far: {stage_report(cfg, qs)}")
-        sys.exit(3)
+    while True:
+        try:
+            # Judge first: it uses the judge model's budget, so answered questions get scored even
+            # while the analyst model's daily budget is spent (and vice versa).
+            if args.stage in ("judge", "all"):
+                stage_judge(qs, args.limit)
+            if args.stage in ("answers", "all"):
+                stage_answers(cfg, qs, args.limit)
+            if args.stage in ("judge", "all"):
+                stage_judge(qs, args.limit)
+            break
+        except StopForToday as exc:
+            print(f"\nStopped: {exc}\nProgress is saved in {WORK}.", flush=True)
+            if not args.until_done:
+                print("Run the same command again later to continue (or add --until-done).")
+                sys.exit(3)
+            print(f"Waiting {args.retry_min:g} min for the rate limit ({datetime.now():%H:%M})...", flush=True)
+            time.sleep(60 * args.retry_min)
     if args.stage in ("report", "all"):
         print(f"report: {stage_report(cfg, qs)}")
 
