@@ -16,6 +16,8 @@ Work in progress. The full README (architecture diagram, results, learnings) com
 - [x] Phase 8: AI in the dashboard: an AI on/off switch and a live side-by-side comparison with the fixed timer
 - [x] Phase 9: LightGBM congestion predictor: each approach's queue 2 minutes ahead, 37% lower error than
       "same as now", drawn as dashed lines running ahead of the live queue chart
+- [x] Phase 10: experiments: 5 controllers on the same 90 random scenarios. The AI beats the fixed timer (−27% waiting),
+      a Webster-timed fixed timer (−12%) and gap-out (−7%), and ties with classic actuated control
 
 ## Quick start
 ```bash
@@ -31,6 +33,7 @@ python -m rl.evaluate         # compare it with the fixed timer and a gap-out ru
 python -m sim --controller rl # headless run with the trained agent
 python -m predict.generate    # log 150 varied runs for the queue predictor (~90 s on 14 cores)
 python -m predict.train_predictor  # train LightGBM on them (~15 s); the dashboard picks it up
+python -m experiments         # 5 controllers x 90 random scenarios (~5 min on 14 cores; --quick to smoke-test)
 pytest -q
 ```
 
@@ -151,4 +154,57 @@ The model's most useful inputs are the demand settings, then the signal-cycle po
 off the sawtooth: when it can't be sure whether the light will have just turned green (queue near 0)
 or be about to (queue at its peak), the error-minimising answer is in between. Full report:
 [`experiments/results/predict/20261111-063145/report.md`](experiments/results/predict/20261111-063145/report.md).
+
+## Experiments: which controller is best?
+`python -m experiments` runs five signal controllers on the **same 90 random scenarios**: 30 in each
+demand band (low 150–300, medium 300–420, high 420–550 veh/h per approach), each with random
+per-approach imbalance (±30%), pedestrians (0–500/h), vehicle mix and seed. Each run is 5 minutes of
+warm-up, then 20 minutes scored. That's 450 runs in ~5 minutes on 14 cores.
+
+| Controller | What it is |
+|---|---|
+| Fixed 25 s | the config's plan: what the dashboard's fixed timer does |
+| Webster fixed | a fixed plan re-timed for **each** scenario with Webster's formula, from its true demand and the saturation flow **measured** on this simulator (2,968 veh/h of green per approach) |
+| Actuated | the classic rule real signals run: a detector covers the last 30 m before the stop line; the green is extended while it is occupied, ends after a 2 s gap, and never exceeds 60 s |
+| Gap-out | Phase 7's rule: switch once the green approach has no queued vehicle (60 s cap) |
+| RL agent | the trained PPO agent (with a 60 s max-green guard; see below) |
+
+Because every controller faces the identical scenarios, the comparison is **paired**: for each
+scenario, the AI's result is compared with each baseline's on exactly the same traffic.
+
+**Total vehicle waiting, AI vs each baseline** (mean per-scenario change, 95% bootstrap CI, scenarios
+won, Wilcoxon signed-rank p):
+
+| Band | vs Fixed 25 s | vs Webster fixed | vs Actuated | vs Gap-out |
+|---|---|---|---|---|
+| Low | −33.7% [−35.9, −31.6], 30/30 | −7.6% [−11.9, −3.3], 22/30 | **+7.3%** [+4.3, +10.6], 8/30 | −3.4% [−5.7, −1.1], 22/30 |
+| Medium | −22.5% [−25.8, −19.3], 30/30 | −15.1% [−17.1, −13.1], 30/30 | +0.4% [−3.0, +3.8], 14/30, p=0.67 | −7.3% [−9.8, −4.7], 23/30 |
+| High | −23.6% [−27.7, −19.7], 30/30 | −13.3% [−16.8, −9.7], 27/30 | −3.0% [−5.2, −0.8], 21/30, p=0.06 | −8.9% [−10.7, −7.1], 29/30 |
+| **All 90** | **−26.6%**, 90/90, p<0.001 | **−12.0%**, 79/90, p<0.001 | **+1.6%** [−0.3, +3.5], 43/90, p=0.58 | **−6.5%**, 74/90, p<0.001 |
+
+![Paired differences](experiments/results/comparison/20261111-071045/plot_paired.png)
+
+What it shows:
+- **The AI clearly beats both fixed timers and gap-out**, in every band. Even a fixed timer re-timed
+  for the exact demand (Webster) waits 12% more on average.
+- **Classic actuated control ties with the AI.** Actuated is better at low demand (its detector
+  ends an empty green within ~2 s; the AI decides on a 5 s grid), they are level at medium demand,
+  and the AI is slightly ahead near capacity (−3%, not quite significant). Overall the difference
+  is +1.6% with p = 0.58: no evidence either is better at moving vehicles.
+- **But actuated does it at the pedestrians' expense**: walkers wait 17% less under the AI
+  (29% less at high demand), because actuated runs long greens (fewer, longer cycles), and the
+  pedestrian phase only comes between greens. Gap-out is kindest to pedestrians (the AI's
+  walkers wait 8% longer than under gap-out).
+
+Mean ± standard deviation of every metric per band, the CSVs and the second plot are in
+[`experiments/results/comparison/20261111-071045/report.md`](experiments/results/comparison/20261111-071045/report.md) (`runs.csv` one row per run, `summary.csv`, `paired.csv`,
+`scenarios.json` with every scenario and Webster plan).
+
+**A failure the experiment found, and the fix.** The first full run
+([`experiments/results/comparison/20261111-070015_unguarded/`](experiments/results/comparison/20261111-070015_unguarded/report.md)) had one scenario at ~135% of capacity where the AI stopped switching:
+one green ran for 16 minutes and it served 38% of demand (actuated: 62%). Every input the network
+sees has a cap; in deep overload queues, backlogs and waits all read "maximum", every situation looks
+the same, and it kept saying "keep". The deployed agent now has the same **60 s max-green guard** as
+gap-out and actuated (the network still decides everything below 60 s; forced switches are logged as
+such). With it the AI serves 64% in that scenario, and the other 89 scenarios are unchanged.
 

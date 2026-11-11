@@ -1,0 +1,2706 @@
+{
+  "scenarios": [
+    {
+      "id": "low-00",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 155.4,
+        "N": 226.4,
+        "S": 221.4,
+        "W": 191.3
+      },
+      "ped_rate_ph": 376.4,
+      "vehicle_mix": {
+        "auto": 0.1313,
+        "bike": 0.5307,
+        "bus": 0.0247,
+        "car": 0.3134
+      },
+      "seed": 253438000
+    },
+    {
+      "id": "low-01",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 265.3,
+        "N": 251.7,
+        "S": 223.8,
+        "W": 289.5
+      },
+      "ped_rate_ph": 217.7,
+      "vehicle_mix": {
+        "auto": 0.1293,
+        "bike": 0.4835,
+        "bus": 0.0275,
+        "car": 0.3596
+      },
+      "seed": 1106284138
+    },
+    {
+      "id": "low-02",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 241.9,
+        "N": 173.9,
+        "S": 217.9,
+        "W": 173.2
+      },
+      "ped_rate_ph": 130.8,
+      "vehicle_mix": {
+        "auto": 0.0938,
+        "bike": 0.4846,
+        "bus": 0.0986,
+        "car": 0.323
+      },
+      "seed": 227041179
+    },
+    {
+      "id": "low-03",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 180.9,
+        "N": 203.6,
+        "S": 192.7,
+        "W": 174.9
+      },
+      "ped_rate_ph": 0.9,
+      "vehicle_mix": {
+        "auto": 0.1632,
+        "bike": 0.331,
+        "bus": 0.0101,
+        "car": 0.4956
+      },
+      "seed": 1505044349
+    },
+    {
+      "id": "low-04",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 279.9,
+        "N": 255.6,
+        "S": 313.4,
+        "W": 343.1
+      },
+      "ped_rate_ph": 444.2,
+      "vehicle_mix": {
+        "auto": 0.2106,
+        "bike": 0.4965,
+        "bus": 0.0169,
+        "car": 0.2759
+      },
+      "seed": 2063214289
+    },
+    {
+      "id": "low-05",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 184.9,
+        "N": 173.2,
+        "S": 184.6,
+        "W": 180.7
+      },
+      "ped_rate_ph": 445.2,
+      "vehicle_mix": {
+        "auto": 0.2415,
+        "bike": 0.3997,
+        "bus": 0.0228,
+        "car": 0.336
+      },
+      "seed": 1333448756
+    },
+    {
+      "id": "low-06",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 304.9,
+        "N": 342.0,
+        "S": 224.7,
+        "W": 307.7
+      },
+      "ped_rate_ph": 201.4,
+      "vehicle_mix": {
+        "auto": 0.1746,
+        "bike": 0.3825,
+        "bus": 0.0164,
+        "car": 0.4266
+      },
+      "seed": 311758171
+    },
+    {
+      "id": "low-07",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 139.0,
+        "N": 115.3,
+        "S": 120.2,
+        "W": 165.4
+      },
+      "ped_rate_ph": 115.8,
+      "vehicle_mix": {
+        "auto": 0.0877,
+        "bike": 0.4826,
+        "bus": 0.0304,
+        "car": 0.3993
+      },
+      "seed": 1645050516
+    },
+    {
+      "id": "low-08",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 223.7,
+        "N": 235.4,
+        "S": 290.0,
+        "W": 254.6
+      },
+      "ped_rate_ph": 372.5,
+      "vehicle_mix": {
+        "auto": 0.0818,
+        "bike": 0.5435,
+        "bus": 0.0593,
+        "car": 0.3154
+      },
+      "seed": 1006466132
+    },
+    {
+      "id": "low-09",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 166.3,
+        "N": 233.1,
+        "S": 151.4,
+        "W": 140.1
+      },
+      "ped_rate_ph": 183.8,
+      "vehicle_mix": {
+        "auto": 0.1661,
+        "bike": 0.3248,
+        "bus": 0.1053,
+        "car": 0.4038
+      },
+      "seed": 1910183176
+    },
+    {
+      "id": "low-10",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 157.5,
+        "N": 133.8,
+        "S": 190.7,
+        "W": 170.5
+      },
+      "ped_rate_ph": 219.1,
+      "vehicle_mix": {
+        "auto": 0.1544,
+        "bike": 0.355,
+        "bus": 0.1336,
+        "car": 0.3571
+      },
+      "seed": 335189952
+    },
+    {
+      "id": "low-11",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 278.0,
+        "N": 340.6,
+        "S": 337.2,
+        "W": 198.9
+      },
+      "ped_rate_ph": 426.7,
+      "vehicle_mix": {
+        "auto": 0.0323,
+        "bike": 0.4929,
+        "bus": 0.246,
+        "car": 0.2288
+      },
+      "seed": 516740489
+    },
+    {
+      "id": "low-12",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 192.3,
+        "N": 156.4,
+        "S": 139.6,
+        "W": 180.4
+      },
+      "ped_rate_ph": 230.9,
+      "vehicle_mix": {
+        "auto": 0.1287,
+        "bike": 0.4369,
+        "bus": 0.0181,
+        "car": 0.4163
+      },
+      "seed": 1597598504
+    },
+    {
+      "id": "low-13",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 302.4,
+        "N": 202.8,
+        "S": 253.9,
+        "W": 211.2
+      },
+      "ped_rate_ph": 208.1,
+      "vehicle_mix": {
+        "auto": 0.1563,
+        "bike": 0.5745,
+        "bus": 0.0497,
+        "car": 0.2195
+      },
+      "seed": 1239269503
+    },
+    {
+      "id": "low-14",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 156.1,
+        "N": 145.9,
+        "S": 135.8,
+        "W": 160.0
+      },
+      "ped_rate_ph": 487.9,
+      "vehicle_mix": {
+        "auto": 0.1468,
+        "bike": 0.4437,
+        "bus": 0.0218,
+        "car": 0.3876
+      },
+      "seed": 328814021
+    },
+    {
+      "id": "low-15",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 260.2,
+        "N": 272.1,
+        "S": 330.1,
+        "W": 358.8
+      },
+      "ped_rate_ph": 496.8,
+      "vehicle_mix": {
+        "auto": 0.1791,
+        "bike": 0.4601,
+        "bus": 0.0139,
+        "car": 0.3468
+      },
+      "seed": 1187530462
+    },
+    {
+      "id": "low-16",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 170.6,
+        "N": 278.3,
+        "S": 239.1,
+        "W": 254.8
+      },
+      "ped_rate_ph": 177.4,
+      "vehicle_mix": {
+        "auto": 0.1108,
+        "bike": 0.5856,
+        "bus": 0.1056,
+        "car": 0.1981
+      },
+      "seed": 107838260
+    },
+    {
+      "id": "low-17",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 210.4,
+        "N": 363.2,
+        "S": 304.0,
+        "W": 215.7
+      },
+      "ped_rate_ph": 468.9,
+      "vehicle_mix": {
+        "auto": 0.0766,
+        "bike": 0.4348,
+        "bus": 0.035,
+        "car": 0.4536
+      },
+      "seed": 2005390042
+    },
+    {
+      "id": "low-18",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 240.7,
+        "N": 230.8,
+        "S": 335.4,
+        "W": 369.7
+      },
+      "ped_rate_ph": 439.8,
+      "vehicle_mix": {
+        "auto": 0.2626,
+        "bike": 0.2997,
+        "bus": 0.0038,
+        "car": 0.4338
+      },
+      "seed": 1723273995
+    },
+    {
+      "id": "low-19",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 228.3,
+        "N": 230.9,
+        "S": 299.3,
+        "W": 334.6
+      },
+      "ped_rate_ph": 371.2,
+      "vehicle_mix": {
+        "auto": 0.1443,
+        "bike": 0.5208,
+        "bus": 0.0379,
+        "car": 0.297
+      },
+      "seed": 1593252908
+    },
+    {
+      "id": "low-20",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 162.2,
+        "N": 241.5,
+        "S": 201.8,
+        "W": 246.7
+      },
+      "ped_rate_ph": 428.7,
+      "vehicle_mix": {
+        "auto": 0.2072,
+        "bike": 0.4225,
+        "bus": 0.0272,
+        "car": 0.3431
+      },
+      "seed": 418452795
+    },
+    {
+      "id": "low-21",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 186.7,
+        "N": 206.7,
+        "S": 259.4,
+        "W": 249.8
+      },
+      "ped_rate_ph": 155.0,
+      "vehicle_mix": {
+        "auto": 0.1298,
+        "bike": 0.5335,
+        "bus": 0.0377,
+        "car": 0.299
+      },
+      "seed": 414829363
+    },
+    {
+      "id": "low-22",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 350.1,
+        "N": 351.4,
+        "S": 222.5,
+        "W": 307.4
+      },
+      "ped_rate_ph": 370.6,
+      "vehicle_mix": {
+        "auto": 0.183,
+        "bike": 0.4044,
+        "bus": 0.0952,
+        "car": 0.3174
+      },
+      "seed": 1676886668
+    },
+    {
+      "id": "low-23",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 251.5,
+        "N": 200.9,
+        "S": 224.9,
+        "W": 200.0
+      },
+      "ped_rate_ph": 257.9,
+      "vehicle_mix": {
+        "auto": 0.2568,
+        "bike": 0.4606,
+        "bus": 0.0101,
+        "car": 0.2724
+      },
+      "seed": 1135501664
+    },
+    {
+      "id": "low-24",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 205.7,
+        "N": 229.8,
+        "S": 188.0,
+        "W": 298.6
+      },
+      "ped_rate_ph": 243.0,
+      "vehicle_mix": {
+        "auto": 0.1582,
+        "bike": 0.383,
+        "bus": 0.0318,
+        "car": 0.427
+      },
+      "seed": 545718466
+    },
+    {
+      "id": "low-25",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 164.9,
+        "N": 151.6,
+        "S": 145.8,
+        "W": 216.0
+      },
+      "ped_rate_ph": 299.1,
+      "vehicle_mix": {
+        "auto": 0.1142,
+        "bike": 0.535,
+        "bus": 0.0132,
+        "car": 0.3376
+      },
+      "seed": 2066741362
+    },
+    {
+      "id": "low-26",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 185.4,
+        "N": 184.1,
+        "S": 143.8,
+        "W": 147.6
+      },
+      "ped_rate_ph": 197.7,
+      "vehicle_mix": {
+        "auto": 0.1171,
+        "bike": 0.5049,
+        "bus": 0.0284,
+        "car": 0.3497
+      },
+      "seed": 1970814748
+    },
+    {
+      "id": "low-27",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 176.2,
+        "N": 148.2,
+        "S": 113.2,
+        "W": 183.0
+      },
+      "ped_rate_ph": 281.4,
+      "vehicle_mix": {
+        "auto": 0.1065,
+        "bike": 0.4453,
+        "bus": 0.0012,
+        "car": 0.447
+      },
+      "seed": 72741064
+    },
+    {
+      "id": "low-28",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 119.4,
+        "N": 204.4,
+        "S": 199.4,
+        "W": 172.3
+      },
+      "ped_rate_ph": 37.3,
+      "vehicle_mix": {
+        "auto": 0.0634,
+        "bike": 0.4329,
+        "bus": 0.0448,
+        "car": 0.4589
+      },
+      "seed": 108664411
+    },
+    {
+      "id": "low-29",
+      "band": "low",
+      "per_approach_vph": {
+        "E": 253.4,
+        "N": 236.7,
+        "S": 334.2,
+        "W": 241.0
+      },
+      "ped_rate_ph": 304.5,
+      "vehicle_mix": {
+        "auto": 0.1516,
+        "bike": 0.4386,
+        "bus": 0.0164,
+        "car": 0.3933
+      },
+      "seed": 179589013
+    },
+    {
+      "id": "medium-00",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 310.2,
+        "N": 281.8,
+        "S": 448.6,
+        "W": 387.8
+      },
+      "ped_rate_ph": 464.8,
+      "vehicle_mix": {
+        "auto": 0.2511,
+        "bike": 0.3208,
+        "bus": 0.0938,
+        "car": 0.3343
+      },
+      "seed": 70674107
+    },
+    {
+      "id": "medium-01",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 401.6,
+        "N": 293.3,
+        "S": 392.0,
+        "W": 392.1
+      },
+      "ped_rate_ph": 442.4,
+      "vehicle_mix": {
+        "auto": 0.1916,
+        "bike": 0.4204,
+        "bus": 0.0545,
+        "car": 0.3334
+      },
+      "seed": 1110638893
+    },
+    {
+      "id": "medium-02",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 330.4,
+        "N": 398.2,
+        "S": 258.1,
+        "W": 350.3
+      },
+      "ped_rate_ph": 265.5,
+      "vehicle_mix": {
+        "auto": 0.0917,
+        "bike": 0.4382,
+        "bus": 0.0026,
+        "car": 0.4675
+      },
+      "seed": 432344946
+    },
+    {
+      "id": "medium-03",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 474.6,
+        "N": 339.2,
+        "S": 281.9,
+        "W": 335.5
+      },
+      "ped_rate_ph": 192.3,
+      "vehicle_mix": {
+        "auto": 0.2538,
+        "bike": 0.5158,
+        "bus": 0.0121,
+        "car": 0.2182
+      },
+      "seed": 1626797384
+    },
+    {
+      "id": "medium-04",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 311.6,
+        "N": 329.6,
+        "S": 321.2,
+        "W": 240.3
+      },
+      "ped_rate_ph": 358.1,
+      "vehicle_mix": {
+        "auto": 0.095,
+        "bike": 0.5065,
+        "bus": 0.0085,
+        "car": 0.39
+      },
+      "seed": 1763529582
+    },
+    {
+      "id": "medium-05",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 502.9,
+        "N": 329.2,
+        "S": 528.7,
+        "W": 473.7
+      },
+      "ped_rate_ph": 83.3,
+      "vehicle_mix": {
+        "auto": 0.0733,
+        "bike": 0.4881,
+        "bus": 0.0026,
+        "car": 0.436
+      },
+      "seed": 1958663215
+    },
+    {
+      "id": "medium-06",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 373.9,
+        "N": 296.7,
+        "S": 331.4,
+        "W": 366.8
+      },
+      "ped_rate_ph": 429.4,
+      "vehicle_mix": {
+        "auto": 0.0592,
+        "bike": 0.4579,
+        "bus": 0.0637,
+        "car": 0.4192
+      },
+      "seed": 80714760
+    },
+    {
+      "id": "medium-07",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 386.1,
+        "N": 285.2,
+        "S": 262.6,
+        "W": 358.9
+      },
+      "ped_rate_ph": 209.8,
+      "vehicle_mix": {
+        "auto": 0.1844,
+        "bike": 0.4697,
+        "bus": 0.0435,
+        "car": 0.3023
+      },
+      "seed": 1893871988
+    },
+    {
+      "id": "medium-08",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 300.3,
+        "N": 364.9,
+        "S": 263.4,
+        "W": 286.8
+      },
+      "ped_rate_ph": 354.2,
+      "vehicle_mix": {
+        "auto": 0.1724,
+        "bike": 0.6303,
+        "bus": 0.0032,
+        "car": 0.1941
+      },
+      "seed": 578172406
+    },
+    {
+      "id": "medium-09",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 390.9,
+        "N": 250.5,
+        "S": 241.9,
+        "W": 238.8
+      },
+      "ped_rate_ph": 387.4,
+      "vehicle_mix": {
+        "auto": 0.1298,
+        "bike": 0.2201,
+        "bus": 0.203,
+        "car": 0.4471
+      },
+      "seed": 1458165544
+    },
+    {
+      "id": "medium-10",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 430.3,
+        "N": 291.6,
+        "S": 366.3,
+        "W": 373.8
+      },
+      "ped_rate_ph": 453.6,
+      "vehicle_mix": {
+        "auto": 0.1618,
+        "bike": 0.3862,
+        "bus": 0.0408,
+        "car": 0.4111
+      },
+      "seed": 2009578487
+    },
+    {
+      "id": "medium-11",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 471.0,
+        "N": 474.9,
+        "S": 384.2,
+        "W": 452.1
+      },
+      "ped_rate_ph": 356.8,
+      "vehicle_mix": {
+        "auto": 0.1039,
+        "bike": 0.6339,
+        "bus": 0.0199,
+        "car": 0.2423
+      },
+      "seed": 200264911
+    },
+    {
+      "id": "medium-12",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 419.5,
+        "N": 376.9,
+        "S": 376.2,
+        "W": 270.0
+      },
+      "ped_rate_ph": 170.5,
+      "vehicle_mix": {
+        "auto": 0.124,
+        "bike": 0.254,
+        "bus": 0.0462,
+        "car": 0.5758
+      },
+      "seed": 65972625
+    },
+    {
+      "id": "medium-13",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 415.5,
+        "N": 437.3,
+        "S": 348.6,
+        "W": 338.6
+      },
+      "ped_rate_ph": 454.1,
+      "vehicle_mix": {
+        "auto": 0.2416,
+        "bike": 0.2924,
+        "bus": 0.0712,
+        "car": 0.3948
+      },
+      "seed": 1739774706
+    },
+    {
+      "id": "medium-14",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 423.7,
+        "N": 234.0,
+        "S": 278.5,
+        "W": 411.5
+      },
+      "ped_rate_ph": 476.2,
+      "vehicle_mix": {
+        "auto": 0.1373,
+        "bike": 0.5423,
+        "bus": 0.046,
+        "car": 0.2743
+      },
+      "seed": 695692942
+    },
+    {
+      "id": "medium-15",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 418.6,
+        "N": 489.0,
+        "S": 442.4,
+        "W": 430.3
+      },
+      "ped_rate_ph": 398.3,
+      "vehicle_mix": {
+        "auto": 0.114,
+        "bike": 0.4404,
+        "bus": 0.0512,
+        "car": 0.3944
+      },
+      "seed": 598751340
+    },
+    {
+      "id": "medium-16",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 483.7,
+        "N": 465.5,
+        "S": 410.6,
+        "W": 455.8
+      },
+      "ped_rate_ph": 354.7,
+      "vehicle_mix": {
+        "auto": 0.1579,
+        "bike": 0.4305,
+        "bus": 0.0107,
+        "car": 0.4009
+      },
+      "seed": 624077343
+    },
+    {
+      "id": "medium-17",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 225.9,
+        "N": 389.8,
+        "S": 214.6,
+        "W": 378.8
+      },
+      "ped_rate_ph": 15.9,
+      "vehicle_mix": {
+        "auto": 0.2398,
+        "bike": 0.3676,
+        "bus": 0.0282,
+        "car": 0.3644
+      },
+      "seed": 823272323
+    },
+    {
+      "id": "medium-18",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 415.8,
+        "N": 426.7,
+        "S": 460.4,
+        "W": 408.1
+      },
+      "ped_rate_ph": 305.8,
+      "vehicle_mix": {
+        "auto": 0.104,
+        "bike": 0.4731,
+        "bus": 0.1246,
+        "car": 0.2984
+      },
+      "seed": 548156813
+    },
+    {
+      "id": "medium-19",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 311.8,
+        "N": 430.4,
+        "S": 334.7,
+        "W": 411.4
+      },
+      "ped_rate_ph": 44.4,
+      "vehicle_mix": {
+        "auto": 0.185,
+        "bike": 0.4737,
+        "bus": 0.0243,
+        "car": 0.3169
+      },
+      "seed": 1131628495
+    },
+    {
+      "id": "medium-20",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 314.4,
+        "N": 279.0,
+        "S": 281.5,
+        "W": 438.8
+      },
+      "ped_rate_ph": 420.2,
+      "vehicle_mix": {
+        "auto": 0.1189,
+        "bike": 0.3547,
+        "bus": 0.1233,
+        "car": 0.403
+      },
+      "seed": 131670079
+    },
+    {
+      "id": "medium-21",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 285.2,
+        "N": 410.1,
+        "S": 491.2,
+        "W": 447.8
+      },
+      "ped_rate_ph": 302.7,
+      "vehicle_mix": {
+        "auto": 0.1723,
+        "bike": 0.499,
+        "bus": 0.1288,
+        "car": 0.1999
+      },
+      "seed": 1891154783
+    },
+    {
+      "id": "medium-22",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 433.5,
+        "N": 369.8,
+        "S": 312.9,
+        "W": 421.5
+      },
+      "ped_rate_ph": 412.4,
+      "vehicle_mix": {
+        "auto": 0.2086,
+        "bike": 0.2387,
+        "bus": 0.065,
+        "car": 0.4877
+      },
+      "seed": 1972100434
+    },
+    {
+      "id": "medium-23",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 263.4,
+        "N": 352.7,
+        "S": 338.0,
+        "W": 354.2
+      },
+      "ped_rate_ph": 194.7,
+      "vehicle_mix": {
+        "auto": 0.1319,
+        "bike": 0.6194,
+        "bus": 0.0032,
+        "car": 0.2456
+      },
+      "seed": 2104261007
+    },
+    {
+      "id": "medium-24",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 253.1,
+        "N": 375.9,
+        "S": 380.9,
+        "W": 275.7
+      },
+      "ped_rate_ph": 470.1,
+      "vehicle_mix": {
+        "auto": 0.0699,
+        "bike": 0.5209,
+        "bus": 0.0953,
+        "car": 0.314
+      },
+      "seed": 580260668
+    },
+    {
+      "id": "medium-25",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 492.3,
+        "N": 376.2,
+        "S": 364.2,
+        "W": 318.7
+      },
+      "ped_rate_ph": 27.8,
+      "vehicle_mix": {
+        "auto": 0.1529,
+        "bike": 0.3647,
+        "bus": 0.0778,
+        "car": 0.4046
+      },
+      "seed": 507794806
+    },
+    {
+      "id": "medium-26",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 343.2,
+        "N": 379.4,
+        "S": 304.0,
+        "W": 287.1
+      },
+      "ped_rate_ph": 416.7,
+      "vehicle_mix": {
+        "auto": 0.2213,
+        "bike": 0.429,
+        "bus": 0.0695,
+        "car": 0.2801
+      },
+      "seed": 523541490
+    },
+    {
+      "id": "medium-27",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 345.6,
+        "N": 402.0,
+        "S": 400.4,
+        "W": 285.7
+      },
+      "ped_rate_ph": 288.5,
+      "vehicle_mix": {
+        "auto": 0.2656,
+        "bike": 0.5183,
+        "bus": 0.0072,
+        "car": 0.2089
+      },
+      "seed": 86281522
+    },
+    {
+      "id": "medium-28",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 294.3,
+        "N": 408.1,
+        "S": 393.1,
+        "W": 276.1
+      },
+      "ped_rate_ph": 383.0,
+      "vehicle_mix": {
+        "auto": 0.1994,
+        "bike": 0.583,
+        "bus": 0.0197,
+        "car": 0.1979
+      },
+      "seed": 1149234759
+    },
+    {
+      "id": "medium-29",
+      "band": "medium",
+      "per_approach_vph": {
+        "E": 402.3,
+        "N": 365.8,
+        "S": 345.1,
+        "W": 377.9
+      },
+      "ped_rate_ph": 190.5,
+      "vehicle_mix": {
+        "auto": 0.1674,
+        "bike": 0.6089,
+        "bus": 0.0064,
+        "car": 0.2173
+      },
+      "seed": 471646276
+    },
+    {
+      "id": "high-00",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 501.8,
+        "N": 489.9,
+        "S": 399.4,
+        "W": 672.8
+      },
+      "ped_rate_ph": 41.0,
+      "vehicle_mix": {
+        "auto": 0.1057,
+        "bike": 0.3489,
+        "bus": 0.0549,
+        "car": 0.4905
+      },
+      "seed": 588360052
+    },
+    {
+      "id": "high-01",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 566.4,
+        "N": 491.8,
+        "S": 546.1,
+        "W": 428.8
+      },
+      "ped_rate_ph": 243.3,
+      "vehicle_mix": {
+        "auto": 0.2917,
+        "bike": 0.4652,
+        "bus": 0.0357,
+        "car": 0.2074
+      },
+      "seed": 1954631304
+    },
+    {
+      "id": "high-02",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 604.7,
+        "N": 453.6,
+        "S": 671.7,
+        "W": 444.3
+      },
+      "ped_rate_ph": 359.0,
+      "vehicle_mix": {
+        "auto": 0.0962,
+        "bike": 0.4935,
+        "bus": 0.0177,
+        "car": 0.3925
+      },
+      "seed": 1277828920
+    },
+    {
+      "id": "high-03",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 469.9,
+        "N": 410.0,
+        "S": 655.5,
+        "W": 442.9
+      },
+      "ped_rate_ph": 229.3,
+      "vehicle_mix": {
+        "auto": 0.1238,
+        "bike": 0.4826,
+        "bus": 0.0955,
+        "car": 0.298
+      },
+      "seed": 1061561237
+    },
+    {
+      "id": "high-04",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 317.4,
+        "N": 319.5,
+        "S": 564.9,
+        "W": 497.0
+      },
+      "ped_rate_ph": 257.7,
+      "vehicle_mix": {
+        "auto": 0.1159,
+        "bike": 0.3781,
+        "bus": 0.1967,
+        "car": 0.3093
+      },
+      "seed": 901278623
+    },
+    {
+      "id": "high-05",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 478.4,
+        "N": 474.0,
+        "S": 589.5,
+        "W": 668.8
+      },
+      "ped_rate_ph": 321.0,
+      "vehicle_mix": {
+        "auto": 0.1685,
+        "bike": 0.561,
+        "bus": 0.0424,
+        "car": 0.2281
+      },
+      "seed": 339658414
+    },
+    {
+      "id": "high-06",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 618.2,
+        "N": 580.8,
+        "S": 562.8,
+        "W": 386.8
+      },
+      "ped_rate_ph": 305.2,
+      "vehicle_mix": {
+        "auto": 0.0369,
+        "bike": 0.4769,
+        "bus": 0.024,
+        "car": 0.4622
+      },
+      "seed": 1028628096
+    },
+    {
+      "id": "high-07",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 575.8,
+        "N": 357.1,
+        "S": 537.7,
+        "W": 317.6
+      },
+      "ped_rate_ph": 359.8,
+      "vehicle_mix": {
+        "auto": 0.1696,
+        "bike": 0.4642,
+        "bus": 0.086,
+        "car": 0.2803
+      },
+      "seed": 1755247401
+    },
+    {
+      "id": "high-08",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 432.5,
+        "N": 554.0,
+        "S": 384.9,
+        "W": 472.3
+      },
+      "ped_rate_ph": 122.6,
+      "vehicle_mix": {
+        "auto": 0.1706,
+        "bike": 0.5823,
+        "bus": 0.0069,
+        "car": 0.2403
+      },
+      "seed": 525288675
+    },
+    {
+      "id": "high-09",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 595.6,
+        "N": 390.9,
+        "S": 396.6,
+        "W": 550.5
+      },
+      "ped_rate_ph": 142.5,
+      "vehicle_mix": {
+        "auto": 0.0775,
+        "bike": 0.5101,
+        "bus": 0.0505,
+        "car": 0.3619
+      },
+      "seed": 446257635
+    },
+    {
+      "id": "high-10",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 668.9,
+        "N": 396.4,
+        "S": 492.7,
+        "W": 668.4
+      },
+      "ped_rate_ph": 293.3,
+      "vehicle_mix": {
+        "auto": 0.0836,
+        "bike": 0.4844,
+        "bus": 0.1217,
+        "car": 0.3104
+      },
+      "seed": 656723625
+    },
+    {
+      "id": "high-11",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 518.1,
+        "N": 559.9,
+        "S": 425.5,
+        "W": 346.0
+      },
+      "ped_rate_ph": 47.5,
+      "vehicle_mix": {
+        "auto": 0.1014,
+        "bike": 0.381,
+        "bus": 0.1166,
+        "car": 0.401
+      },
+      "seed": 686431201
+    },
+    {
+      "id": "high-12",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 407.9,
+        "N": 391.7,
+        "S": 639.1,
+        "W": 477.2
+      },
+      "ped_rate_ph": 274.4,
+      "vehicle_mix": {
+        "auto": 0.1853,
+        "bike": 0.3847,
+        "bus": 0.1108,
+        "car": 0.3192
+      },
+      "seed": 353600192
+    },
+    {
+      "id": "high-13",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 374.4,
+        "N": 344.3,
+        "S": 380.1,
+        "W": 510.2
+      },
+      "ped_rate_ph": 41.7,
+      "vehicle_mix": {
+        "auto": 0.2643,
+        "bike": 0.4669,
+        "bus": 0.0521,
+        "car": 0.2166
+      },
+      "seed": 120317523
+    },
+    {
+      "id": "high-14",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 411.6,
+        "N": 556.6,
+        "S": 433.1,
+        "W": 646.4
+      },
+      "ped_rate_ph": 439.6,
+      "vehicle_mix": {
+        "auto": 0.1714,
+        "bike": 0.4376,
+        "bus": 0.0364,
+        "car": 0.3546
+      },
+      "seed": 1710749895
+    },
+    {
+      "id": "high-15",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 638.7,
+        "N": 419.5,
+        "S": 428.2,
+        "W": 384.0
+      },
+      "ped_rate_ph": 248.0,
+      "vehicle_mix": {
+        "auto": 0.0682,
+        "bike": 0.4393,
+        "bus": 0.0429,
+        "car": 0.4496
+      },
+      "seed": 1063027190
+    },
+    {
+      "id": "high-16",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 567.7,
+        "N": 601.3,
+        "S": 554.6,
+        "W": 476.5
+      },
+      "ped_rate_ph": 133.6,
+      "vehicle_mix": {
+        "auto": 0.1783,
+        "bike": 0.5356,
+        "bus": 0.0114,
+        "car": 0.2747
+      },
+      "seed": 1029219618
+    },
+    {
+      "id": "high-17",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 591.5,
+        "N": 598.3,
+        "S": 688.8,
+        "W": 593.4
+      },
+      "ped_rate_ph": 39.4,
+      "vehicle_mix": {
+        "auto": 0.131,
+        "bike": 0.6077,
+        "bus": 0.0289,
+        "car": 0.2324
+      },
+      "seed": 1900794803
+    },
+    {
+      "id": "high-18",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 566.9,
+        "N": 402.3,
+        "S": 566.6,
+        "W": 340.6
+      },
+      "ped_rate_ph": 302.0,
+      "vehicle_mix": {
+        "auto": 0.1657,
+        "bike": 0.4907,
+        "bus": 0.0662,
+        "car": 0.2774
+      },
+      "seed": 1311795436
+    },
+    {
+      "id": "high-19",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 392.4,
+        "N": 576.5,
+        "S": 473.5,
+        "W": 509.6
+      },
+      "ped_rate_ph": 304.7,
+      "vehicle_mix": {
+        "auto": 0.0854,
+        "bike": 0.6263,
+        "bus": 0.0243,
+        "car": 0.264
+      },
+      "seed": 1136000681
+    },
+    {
+      "id": "high-20",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 367.3,
+        "N": 551.1,
+        "S": 435.4,
+        "W": 412.1
+      },
+      "ped_rate_ph": 52.5,
+      "vehicle_mix": {
+        "auto": 0.2274,
+        "bike": 0.4196,
+        "bus": 0.0696,
+        "car": 0.2834
+      },
+      "seed": 1763708349
+    },
+    {
+      "id": "high-21",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 525.6,
+        "N": 604.1,
+        "S": 613.7,
+        "W": 490.1
+      },
+      "ped_rate_ph": 34.9,
+      "vehicle_mix": {
+        "auto": 0.159,
+        "bike": 0.5847,
+        "bus": 0.0144,
+        "car": 0.2419
+      },
+      "seed": 181683695
+    },
+    {
+      "id": "high-22",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 382.5,
+        "N": 428.6,
+        "S": 443.5,
+        "W": 485.3
+      },
+      "ped_rate_ph": 67.0,
+      "vehicle_mix": {
+        "auto": 0.1813,
+        "bike": 0.5517,
+        "bus": 0.0212,
+        "car": 0.2459
+      },
+      "seed": 790384579
+    },
+    {
+      "id": "high-23",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 418.4,
+        "N": 454.9,
+        "S": 502.9,
+        "W": 514.1
+      },
+      "ped_rate_ph": 444.2,
+      "vehicle_mix": {
+        "auto": 0.0824,
+        "bike": 0.4424,
+        "bus": 0.0592,
+        "car": 0.4161
+      },
+      "seed": 1618079742
+    },
+    {
+      "id": "high-24",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 587.9,
+        "N": 525.5,
+        "S": 375.5,
+        "W": 576.0
+      },
+      "ped_rate_ph": 257.3,
+      "vehicle_mix": {
+        "auto": 0.1193,
+        "bike": 0.2992,
+        "bus": 0.1713,
+        "car": 0.4101
+      },
+      "seed": 1389243957
+    },
+    {
+      "id": "high-25",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 460.0,
+        "N": 578.7,
+        "S": 433.9,
+        "W": 524.1
+      },
+      "ped_rate_ph": 36.8,
+      "vehicle_mix": {
+        "auto": 0.1488,
+        "bike": 0.3403,
+        "bus": 0.0198,
+        "car": 0.4911
+      },
+      "seed": 767817015
+    },
+    {
+      "id": "high-26",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 474.7,
+        "N": 504.4,
+        "S": 405.8,
+        "W": 510.9
+      },
+      "ped_rate_ph": 244.8,
+      "vehicle_mix": {
+        "auto": 0.1711,
+        "bike": 0.3775,
+        "bus": 0.0692,
+        "car": 0.3823
+      },
+      "seed": 812427977
+    },
+    {
+      "id": "high-27",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 379.5,
+        "N": 527.6,
+        "S": 498.3,
+        "W": 578.3
+      },
+      "ped_rate_ph": 432.8,
+      "vehicle_mix": {
+        "auto": 0.0932,
+        "bike": 0.3301,
+        "bus": 0.0323,
+        "car": 0.5445
+      },
+      "seed": 1525270876
+    },
+    {
+      "id": "high-28",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 662.2,
+        "N": 704.5,
+        "S": 582.6,
+        "W": 473.5
+      },
+      "ped_rate_ph": 332.0,
+      "vehicle_mix": {
+        "auto": 0.1462,
+        "bike": 0.2926,
+        "bus": 0.2547,
+        "car": 0.3065
+      },
+      "seed": 1929940908
+    },
+    {
+      "id": "high-29",
+      "band": "high",
+      "per_approach_vph": {
+        "E": 456.0,
+        "N": 349.4,
+        "S": 564.6,
+        "W": 465.3
+      },
+      "ped_rate_ph": 137.7,
+      "vehicle_mix": {
+        "auto": 0.1852,
+        "bike": 0.4731,
+        "bus": 0.0415,
+        "car": 0.3002
+      },
+      "seed": 1814505110
+    }
+  ],
+  "webster_plans": {
+    "low-00": {
+      "cycle_s": 93.1,
+      "greens_s": [
+        14.5,
+        10.0,
+        14.2,
+        12.3
+      ],
+      "Y": 0.268,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-01": {
+      "cycle_s": 104.3,
+      "greens_s": [
+        15.2,
+        16.0,
+        13.5,
+        17.5
+      ],
+      "Y": 0.347,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-02": {
+      "cycle_s": 92.0,
+      "greens_s": [
+        10.9,
+        15.2,
+        13.7,
+        10.9
+      ],
+      "Y": 0.272,
+      "lost_s": 41.3,
+      "capped": false
+    },
+    "low-03": {
+      "cycle_s": 48.3,
+      "greens_s": [
+        7.6,
+        7.0,
+        7.2,
+        7.0
+      ],
+      "Y": 0.253,
+      "lost_s": 20.3,
+      "capped": false
+    },
+    "low-04": {
+      "cycle_s": 113.9,
+      "greens_s": [
+        15.4,
+        16.9,
+        18.9,
+        20.7
+      ],
+      "Y": 0.402,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-05": {
+      "cycle_s": 90.1,
+      "greens_s": [
+        11.5,
+        12.3,
+        12.3,
+        12.0
+      ],
+      "Y": 0.244,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-06": {
+      "cycle_s": 113.0,
+      "greens_s": [
+        20.6,
+        18.3,
+        13.5,
+        18.5
+      ],
+      "Y": 0.397,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-07": {
+      "cycle_s": 80.2,
+      "greens_s": [
+        8.5,
+        10.2,
+        8.9,
+        12.2
+      ],
+      "Y": 0.182,
+      "lost_s": 40.4,
+      "capped": false
+    },
+    "low-08": {
+      "cycle_s": 103.0,
+      "greens_s": [
+        14.3,
+        13.6,
+        17.6,
+        15.4
+      ],
+      "Y": 0.338,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-09": {
+      "cycle_s": 88.4,
+      "greens_s": [
+        15.7,
+        11.2,
+        10.2,
+        9.4
+      ],
+      "Y": 0.233,
+      "lost_s": 41.9,
+      "capped": false
+    },
+    "low-10": {
+      "cycle_s": 87.1,
+      "greens_s": [
+        9.3,
+        10.9,
+        13.2,
+        11.8
+      ],
+      "Y": 0.22,
+      "lost_s": 42.0,
+      "capped": false
+    },
+    "low-11": {
+      "cycle_s": 111.6,
+      "greens_s": [
+        20.5,
+        16.7,
+        20.3,
+        12.0
+      ],
+      "Y": 0.389,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-12": {
+      "cycle_s": 87.8,
+      "greens_s": [
+        10.7,
+        13.2,
+        9.6,
+        12.4
+      ],
+      "Y": 0.225,
+      "lost_s": 42.0,
+      "capped": false
+    },
+    "low-13": {
+      "cycle_s": 101.1,
+      "greens_s": [
+        12.3,
+        18.4,
+        15.5,
+        12.9
+      ],
+      "Y": 0.327,
+      "lost_s": 42.0,
+      "capped": false
+    },
+    "low-14": {
+      "cycle_s": 85.3,
+      "greens_s": [
+        10.6,
+        11.3,
+        9.8,
+        11.6
+      ],
+      "Y": 0.201,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-15": {
+      "cycle_s": 115.8,
+      "greens_s": [
+        16.4,
+        15.7,
+        19.9,
+        21.7
+      ],
+      "Y": 0.411,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-16": {
+      "cycle_s": 99.5,
+      "greens_s": [
+        17.0,
+        10.4,
+        14.6,
+        15.6
+      ],
+      "Y": 0.318,
+      "lost_s": 41.9,
+      "capped": false
+    },
+    "low-17": {
+      "cycle_s": 107.9,
+      "greens_s": [
+        21.9,
+        12.7,
+        18.3,
+        13.0
+      ],
+      "Y": 0.368,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-18": {
+      "cycle_s": 112.9,
+      "greens_s": [
+        13.9,
+        14.5,
+        20.2,
+        22.3
+      ],
+      "Y": 0.396,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-19": {
+      "cycle_s": 107.9,
+      "greens_s": [
+        13.9,
+        13.7,
+        18.0,
+        20.1
+      ],
+      "Y": 0.368,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-20": {
+      "cycle_s": 95.6,
+      "greens_s": [
+        15.2,
+        10.2,
+        12.7,
+        15.5
+      ],
+      "Y": 0.287,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-21": {
+      "cycle_s": 97.2,
+      "greens_s": [
+        12.7,
+        11.5,
+        15.9,
+        15.3
+      ],
+      "Y": 0.304,
+      "lost_s": 41.8,
+      "capped": false
+    },
+    "low-22": {
+      "cycle_s": 116.5,
+      "greens_s": [
+        21.2,
+        21.1,
+        13.4,
+        18.6
+      ],
+      "Y": 0.415,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-23": {
+      "cycle_s": 96.7,
+      "greens_s": [
+        12.5,
+        15.7,
+        14.0,
+        12.5
+      ],
+      "Y": 0.296,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-24": {
+      "cycle_s": 98.8,
+      "greens_s": [
+        14.1,
+        12.7,
+        11.6,
+        18.4
+      ],
+      "Y": 0.311,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-25": {
+      "cycle_s": 88.3,
+      "greens_s": [
+        10.3,
+        11.2,
+        9.9,
+        14.7
+      ],
+      "Y": 0.229,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-26": {
+      "cycle_s": 87.3,
+      "greens_s": [
+        12.6,
+        12.7,
+        9.9,
+        10.1
+      ],
+      "Y": 0.223,
+      "lost_s": 41.9,
+      "capped": false
+    },
+    "low-27": {
+      "cycle_s": 86.1,
+      "greens_s": [
+        10.5,
+        12.5,
+        8.0,
+        13.0
+      ],
+      "Y": 0.209,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "low-28": {
+      "cycle_s": 67.5,
+      "greens_s": [
+        10.7,
+        7.0,
+        10.4,
+        9.0
+      ],
+      "Y": 0.234,
+      "lost_s": 31.1,
+      "capped": false
+    },
+    "low-29": {
+      "cycle_s": 106.3,
+      "greens_s": [
+        14.3,
+        15.3,
+        20.1,
+        14.5
+      ],
+      "Y": 0.359,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-00": {
+      "cycle_s": 131.4,
+      "greens_s": [
+        17.6,
+        19.4,
+        28.0,
+        24.2
+      ],
+      "Y": 0.481,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-01": {
+      "cycle_s": 135.9,
+      "greens_s": [
+        18.6,
+        25.5,
+        24.8,
+        24.9
+      ],
+      "Y": 0.498,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-02": {
+      "cycle_s": 124.0,
+      "greens_s": [
+        24.4,
+        20.2,
+        15.8,
+        21.5
+      ],
+      "Y": 0.451,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-03": {
+      "cycle_s": 131.6,
+      "greens_s": [
+        21.2,
+        29.7,
+        17.6,
+        21.0
+      ],
+      "Y": 0.482,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-04": {
+      "cycle_s": 114.6,
+      "greens_s": [
+        19.9,
+        18.8,
+        19.4,
+        14.5
+      ],
+      "Y": 0.405,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-05": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        19.5,
+        29.8,
+        31.3,
+        28.0
+      ],
+      "Y": 0.618,
+      "lost_s": 41.4,
+      "capped": true
+    },
+    "medium-06": {
+      "cycle_s": 126.5,
+      "greens_s": [
+        18.3,
+        23.1,
+        20.4,
+        22.6
+      ],
+      "Y": 0.461,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-07": {
+      "cycle_s": 120.7,
+      "greens_s": [
+        17.3,
+        23.5,
+        16.0,
+        21.8
+      ],
+      "Y": 0.436,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-08": {
+      "cycle_s": 115.4,
+      "greens_s": [
+        22.0,
+        18.1,
+        15.9,
+        17.3
+      ],
+      "Y": 0.41,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-09": {
+      "cycle_s": 109.6,
+      "greens_s": [
+        15.1,
+        23.5,
+        14.5,
+        14.4
+      ],
+      "Y": 0.378,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-10": {
+      "cycle_s": 134.3,
+      "greens_s": [
+        18.4,
+        27.1,
+        23.1,
+        23.6
+      ],
+      "Y": 0.493,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-11": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        28.8,
+        28.5,
+        23.3,
+        27.4
+      ],
+      "Y": 0.601,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "medium-12": {
+      "cycle_s": 132.5,
+      "greens_s": [
+        23.6,
+        26.3,
+        23.6,
+        16.9
+      ],
+      "Y": 0.486,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-13": {
+      "cycle_s": 141.7,
+      "greens_s": [
+        28.3,
+        26.9,
+        22.5,
+        21.9
+      ],
+      "Y": 0.519,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-14": {
+      "cycle_s": 124.8,
+      "greens_s": [
+        14.4,
+        26.0,
+        17.1,
+        25.3
+      ],
+      "Y": 0.454,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-15": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        29.6,
+        25.4,
+        26.8,
+        26.1
+      ],
+      "Y": 0.6,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "medium-16": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        27.7,
+        28.7,
+        24.4,
+        27.1
+      ],
+      "Y": 0.612,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "medium-17": {
+      "cycle_s": 74.8,
+      "greens_s": [
+        15.7,
+        9.1,
+        8.6,
+        15.2
+      ],
+      "Y": 0.407,
+      "lost_s": 26.2,
+      "capped": false
+    },
+    "medium-18": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        26.9,
+        26.2,
+        29.0,
+        25.7
+      ],
+      "Y": 0.577,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "medium-19": {
+      "cycle_s": 121.9,
+      "greens_s": [
+        24.5,
+        17.8,
+        19.1,
+        23.4
+      ],
+      "Y": 0.501,
+      "lost_s": 37.2,
+      "capped": false
+    },
+    "medium-20": {
+      "cycle_s": 122.3,
+      "greens_s": [
+        17.0,
+        19.2,
+        17.2,
+        26.8
+      ],
+      "Y": 0.443,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-21": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        27.1,
+        18.8,
+        32.4,
+        29.6
+      ],
+      "Y": 0.551,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "medium-22": {
+      "cycle_s": 141.4,
+      "greens_s": [
+        23.9,
+        28.0,
+        20.2,
+        27.2
+      ],
+      "Y": 0.518,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-23": {
+      "cycle_s": 121.8,
+      "greens_s": [
+        21.5,
+        16.1,
+        20.6,
+        21.6
+      ],
+      "Y": 0.441,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-24": {
+      "cycle_s": 120.2,
+      "greens_s": [
+        22.8,
+        15.4,
+        23.1,
+        16.8
+      ],
+      "Y": 0.433,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-25": {
+      "cycle_s": 114.0,
+      "greens_s": [
+        19.7,
+        25.7,
+        19.0,
+        16.7
+      ],
+      "Y": 0.523,
+      "lost_s": 32.9,
+      "capped": false
+    },
+    "medium-26": {
+      "cycle_s": 122.3,
+      "greens_s": [
+        23.2,
+        20.9,
+        18.6,
+        17.5
+      ],
+      "Y": 0.443,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-27": {
+      "cycle_s": 131.8,
+      "greens_s": [
+        25.2,
+        21.6,
+        25.1,
+        17.9
+      ],
+      "Y": 0.483,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-28": {
+      "cycle_s": 126.7,
+      "greens_s": [
+        25.2,
+        18.2,
+        24.2,
+        17.0
+      ],
+      "Y": 0.462,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "medium-29": {
+      "cycle_s": 136.9,
+      "greens_s": [
+        23.3,
+        25.6,
+        21.9,
+        24.0
+      ],
+      "Y": 0.502,
+      "lost_s": 42.1,
+      "capped": false
+    },
+    "high-00": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        26.6,
+        27.2,
+        21.7,
+        36.5
+      ],
+      "Y": 0.695,
+      "lost_s": 38.1,
+      "capped": true
+    },
+    "high-01": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        26.1,
+        30.1,
+        29.0,
+        22.8
+      ],
+      "Y": 0.685,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-02": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        22.5,
+        30.0,
+        33.3,
+        22.0
+      ],
+      "Y": 0.733,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-03": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        22.4,
+        25.6,
+        35.8,
+        24.2
+      ],
+      "Y": 0.667,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-04": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        20.3,
+        20.2,
+        35.9,
+        31.6
+      ],
+      "Y": 0.572,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-05": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        23.1,
+        23.3,
+        28.8,
+        32.6
+      ],
+      "Y": 0.745,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-06": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        29.2,
+        31.0,
+        28.3,
+        19.4
+      ],
+      "Y": 0.724,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-07": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        21.5,
+        34.7,
+        32.4,
+        19.2
+      ],
+      "Y": 0.603,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-08": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        32.5,
+        25.3,
+        22.6,
+        27.7
+      ],
+      "Y": 0.621,
+      "lost_s": 42.0,
+      "capped": true
+    },
+    "high-09": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        21.8,
+        33.3,
+        22.1,
+        30.7
+      ],
+      "Y": 0.652,
+      "lost_s": 42.0,
+      "capped": true
+    },
+    "high-10": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        19.2,
+        32.4,
+        23.9,
+        32.4
+      ],
+      "Y": 0.75,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-11": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        33.6,
+        31.1,
+        25.5,
+        20.8
+      ],
+      "Y": 0.623,
+      "lost_s": 39.0,
+      "capped": true
+    },
+    "high-12": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        22.1,
+        23.0,
+        36.0,
+        26.9
+      ],
+      "Y": 0.646,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-13": {
+      "cycle_s": 133.4,
+      "greens_s": [
+        20.5,
+        22.3,
+        22.7,
+        30.4
+      ],
+      "Y": 0.542,
+      "lost_s": 37.4,
+      "capped": false
+    },
+    "high-14": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        29.3,
+        21.7,
+        22.8,
+        34.1
+      ],
+      "Y": 0.69,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-15": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        24.2,
+        36.8,
+        24.7,
+        22.2
+      ],
+      "Y": 0.63,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-16": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        29.5,
+        27.9,
+        27.2,
+        23.4
+      ],
+      "Y": 0.741,
+      "lost_s": 42.0,
+      "capped": true
+    },
+    "high-17": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        27.2,
+        26.8,
+        31.3,
+        26.9
+      ],
+      "Y": 0.833,
+      "lost_s": 37.8,
+      "capped": true
+    },
+    "high-18": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        23.1,
+        32.6,
+        32.6,
+        19.6
+      ],
+      "Y": 0.632,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-19": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        31.9,
+        21.7,
+        26.2,
+        28.2
+      ],
+      "Y": 0.658,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-20": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        34.4,
+        23.0,
+        27.2,
+        25.8
+      ],
+      "Y": 0.595,
+      "lost_s": 39.6,
+      "capped": true
+    },
+    "high-21": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        30.6,
+        26.6,
+        31.1,
+        24.8
+      ],
+      "Y": 0.753,
+      "lost_s": 36.9,
+      "capped": true
+    },
+    "high-22": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        26.9,
+        24.0,
+        27.8,
+        30.5
+      ],
+      "Y": 0.586,
+      "lost_s": 40.7,
+      "capped": true
+    },
+    "high-23": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        26.0,
+        23.9,
+        28.7,
+        29.3
+      ],
+      "Y": 0.637,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-24": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        27.5,
+        30.7,
+        19.6,
+        30.1
+      ],
+      "Y": 0.696,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-25": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        32.7,
+        26.0,
+        24.5,
+        29.6
+      ],
+      "Y": 0.673,
+      "lost_s": 37.3,
+      "capped": true
+    },
+    "high-26": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        28.7,
+        27.0,
+        23.1,
+        29.1
+      ],
+      "Y": 0.639,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-27": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        28.7,
+        20.6,
+        27.1,
+        31.5
+      ],
+      "Y": 0.668,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-28": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        31.4,
+        29.5,
+        25.9,
+        21.1
+      ],
+      "Y": 0.816,
+      "lost_s": 42.1,
+      "capped": true
+    },
+    "high-29": {
+      "cycle_s": 150.0,
+      "greens_s": [
+        20.6,
+        26.8,
+        33.2,
+        27.4
+      ],
+      "Y": 0.618,
+      "lost_s": 42.0,
+      "capped": true
+    }
+  }
+}
