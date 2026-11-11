@@ -115,9 +115,13 @@ class KnowledgeBase:
             stats["chunks"] += len(chunks)
             log(f"  + {key}: {len(chunks)} chunks ({chunks[0].metadata['cite']}) in {time.perf_counter() - t0:.0f} s")
         for key in list(self.state["docs"]):
-            if key not in seen:  # the PDF was deleted: its chunks go too
-                self.store.delete({"doc_id": self.state["docs"][key]["doc_id"]})
+            if key not in seen:  # the PDF was deleted (or renamed): its chunks go too...
+                doc_id = self.state["docs"][key]["doc_id"]
                 del self.state["docs"][key]
+                # ...unless a file that IS still there has the same doc_id (a renamed file keeps its
+                # catalogue id): deleting by id would wipe the chunks just indexed for it.
+                if all(v["doc_id"] != doc_id for v in self.state["docs"].values()):
+                    self.store.delete({"doc_id": doc_id})
                 stats["removed"] += 1
         self._save_state()
         return stats

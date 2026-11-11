@@ -202,6 +202,20 @@ def test_build_is_incremental_and_removes_deleted_sources(kb, tmp_path):
     os.utime(f, (f.stat().st_atime, f.stat().st_mtime + 5))
     assert kb.index_run(kb.cfg.runs_path() / run) > 0
     assert kb.store.count() == total
+    # A renamed PDF with the same doc id (a catalogue entry keeps its id) keeps its chunks.
+    import rag.ingest as ingest
+    real_describe = ingest.describe
+    ingest.describe = lambda path, doc=None: {**real_describe(path, doc), "id": "manual"}
+    try:
+        kb.index_docs(force=True, log=lambda *_: None)
+        (tmp_path / "docs" / "test_manual.pdf").rename(tmp_path / "docs" / "renamed.pdf")
+        s = kb.index_docs(log=lambda *_: None)
+        assert s["indexed"] == 1 and s["removed"] == 1
+        assert kb.store.count() == total
+    finally:
+        ingest.describe = real_describe
+    (tmp_path / "docs" / "renamed.pdf").rename(tmp_path / "docs" / "test_manual.pdf")
+    kb.index_docs(force=True, log=lambda *_: None)
     # A deleted PDF's chunks are removed.
     (tmp_path / "docs" / "test_manual.pdf").unlink()
     assert kb.index_docs(log=lambda *_: None)["removed"] == 1
