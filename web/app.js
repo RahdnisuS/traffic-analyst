@@ -21,7 +21,20 @@ let mode = "2d";
 let layoutArgs = null; // last init's layout, replayed into the 3D view if it loads later
 const active = () => views[mode];
 const charts = new Charts($("ch-queue"), $("ch-delay"));
-const chat = new Chat($("tab-analyst"), { send });
+// This tab's session id. On the public demo each tab gets its own simulation (the server keys it
+// by this id); sessionStorage survives a reload, so a reload reconnects to the same sim, while a
+// new tab starts a new one. Locally the server ignores it (one shared sim).
+const SESSION = (() => {
+  const fresh = () => (crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  try {
+    let id = sessionStorage.getItem("ta-session");
+    if (!id) sessionStorage.setItem("ta-session", (id = fresh()));
+    return id;
+  } catch {
+    return fresh();
+  }
+})();
+const chat = new Chat($("tab-analyst"), { send, session: SESSION });
 const state = { limits: null, playing: false, speed: 1, ws: null, retry: 0, types: [],
   controller: "fixed", aiAvailable: false, comparing: false, seed: null };
 const CONTROLLER_NAMES = { fixed: "fixed timer", rl: "AI" };
@@ -31,11 +44,17 @@ const TYPE_NAMES = { car: "Cars", bike: "Bikes", auto: "Autos", bus: "Buses" };
 // ------------------------------------------------------------------ connection
 function connect() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  const ws = new WebSocket(`${proto}://${location.host}/ws/sim`);
+  const ws = new WebSocket(`${proto}://${location.host}/ws/sim?session=${encodeURIComponent(SESSION)}`);
   state.ws = ws;
+  state.busy = false;
   ws.onopen = () => { state.retry = 0; setConn("Live", "ok"); };
   ws.onmessage = (ev) => handle(JSON.parse(ev.data));
   ws.onclose = () => {
+    if (state.busy) {
+      setConn("Demo busy, retrying…", "bad");
+      setTimeout(connect, 20000); // every slot taken: someone else's sim must close first
+      return;
+    }
     setConn("Disconnected, retrying…", "bad");
     // Exponential backoff (0.5 s, 1 s, 2 s … capped at 8 s) so a restarting server isn't hammered.
     const wait = Math.min(8000, 500 * 2 ** state.retry++);
@@ -101,6 +120,10 @@ function handle(msg) {
       break;
     case "error":
       setSwitchBusy(false);
+      toast(msg.message);
+      break;
+    case "busy":
+      state.busy = true;
       toast(msg.message);
       break;
   }

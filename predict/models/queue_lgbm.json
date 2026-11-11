@@ -1,0 +1,146 @@
+{
+  "created_at": "2026-11-11T06:31:45+00:00",
+  "git_commit": "5227385+dirty",
+  "horizon_s": 120,
+  "features": [
+    "queue_now",
+    "queue_lag10",
+    "queue_lag30",
+    "queue_lag60",
+    "queue_lag90",
+    "queue_lag120",
+    "queue_mean120",
+    "queue_max120",
+    "backlog_now",
+    "backlog_lag60",
+    "wait_now",
+    "arrivals_vph60",
+    "arrivals_vph300",
+    "phases_until_green",
+    "green_now",
+    "secs_since_green",
+    "green_share120",
+    "stage",
+    "time_in_stage",
+    "queue_green_arm",
+    "secs_since_ped",
+    "greens_since_ped",
+    "queue_others",
+    "backlog_others",
+    "peds_waiting",
+    "demand_vph",
+    "demand_others_vph",
+    "ped_rate_ph",
+    "green_s",
+    "controller",
+    "run_time"
+  ],
+  "categorical": [
+    "controller",
+    "stage"
+  ],
+  "dataset_dir": "E:\\TrafficSimulation+RAG\\data\\predictor_runs",
+  "runs": {
+    "train": 90,
+    "val": 30,
+    "test": 30
+  },
+  "samples": {
+    "train": 77760,
+    "val": 25920,
+    "test": 25920
+  },
+  "params": {
+    "objective": "l1",
+    "learning_rate": 0.05,
+    "num_leaves": 31,
+    "min_data_in_leaf": 50,
+    "feature_fraction": 0.9,
+    "bagging_fraction": 0.8,
+    "bagging_freq": 1,
+    "metric": "l1",
+    "seed": 7,
+    "deterministic": true,
+    "force_row_wise": true,
+    "verbosity": -1
+  },
+  "best_iteration": 824,
+  "val_mae_curve_every_50": [
+    5.8176,
+    3.9638,
+    3.8748,
+    3.8163,
+    3.7894,
+    3.7882,
+    3.7693,
+    3.7622,
+    3.7553,
+    3.7521,
+    3.7479,
+    3.7487,
+    3.7489,
+    3.7466,
+    3.7452,
+    3.7422,
+    3.7417,
+    3.7408,
+    3.741
+  ],
+  "test": {
+    "overall": {
+      "lightgbm": 3.308,
+      "persistence": 5.252,
+      "recent_mean": 4.122,
+      "n": 25920,
+      "skill_vs_persistence": 0.37
+    },
+    "by_controller": {
+      "fixed": {
+        "lightgbm": 3.083,
+        "persistence": 4.81,
+        "recent_mean": 4.049,
+        "n": 8640,
+        "skill_vs_persistence": 0.359
+      },
+      "gap_out": {
+        "lightgbm": 3.885,
+        "persistence": 5.977,
+        "recent_mean": 4.514,
+        "n": 8640,
+        "skill_vs_persistence": 0.35
+      },
+      "rl": {
+        "lightgbm": 2.957,
+        "persistence": 4.969,
+        "recent_mean": 3.803,
+        "n": 8640,
+        "skill_vs_persistence": 0.405
+      }
+    },
+    "by_demand": {
+      "low (<300 veh/h)": {
+        "lightgbm": 1.416,
+        "persistence": 2.383,
+        "recent_mean": 1.928,
+        "n": 10368,
+        "skill_vs_persistence": 0.406
+      },
+      "medium (300-450)": {
+        "lightgbm": 3.067,
+        "persistence": 4.057,
+        "recent_mean": 3.749,
+        "n": 7776,
+        "skill_vs_persistence": 0.244
+      },
+      "high (>450, over capacity)": {
+        "lightgbm": 6.073,
+        "persistence": 10.273,
+        "recent_mean": 7.42,
+        "n": 7776,
+        "skill_vs_persistence": 0.409
+      }
+    },
+    "mean_queue": 7.54
+  },
+  "results_dir": "experiments\\results\\predict\\20261111-063145"
+}

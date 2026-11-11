@@ -1,4 +1,9 @@
-"""The live simulation(s) shared by every connected browser, plus the streaming loop.
+"""One dashboard session: the live simulation(s) its browsers watch, plus the streaming loop.
+
+Locally there is one session shared by every browser; the public demo gives each browser tab its
+own (``server.sessions: per_visitor``, managed by ``server.sessions.SessionManager``). Either way the
+heavy, read-only parts (the RL network, the queue predictor) are loaded once per server
+(``SharedModels``) and used by every session.
 
 Design:
   * The sim is advanced by a single asyncio task at FRAME_HZ (20 Hz). Each tick
@@ -221,9 +226,57 @@ class LiveRun:
                 "backlog": sim.spawner.backlog_size(), "vehicles": vehicles, "peds": peds}
 
 
+class SharedModels:
+    """Loaded once per server and shared by every session: the trained PPO network (torch, ~2 s to
+    import, so on first use and in a worker thread) and the queue predictor (small, at start-up).
+    Sharing is safe because both are only READ: each sim gets its own policy object and decision
+    clock around the one network."""
+
+    def __init__(self, cfg: Config):
+        self.cfg = cfg
+        self.rl = None
+        self._lock = asyncio.Lock()
+        self.forecaster = self._load_forecaster()
+
+    def ai_available(self) -> bool:
+        return self.cfg.rl_model_path().is_file()
+
+    def _load_forecaster(self):
+        """The queue predictor, if one has been trained. It is small (a text file of trees) and
+        lightgbm imports quickly, so unlike the RL model it loads at start-up."""
+        if not self.cfg.predict_model_path().is_file():
+            return None
+        try:
+            from predict.forecaster import QueueForecaster
+            return QueueForecaster.load(self.cfg)
+        except Exception:  # no lightgbm, or a model from an older feature list: run without it
+            log.exception("queue predictor not loaded; the dashboard runs without forecasts")
+            return None
+
+    async def ensure_rl(self):
+        """Load the trained network once, in a worker thread (importing torch takes seconds and
+        must not freeze the stream for everyone)."""
+        async with self._lock:
+            if self.rl is None:
+                if not self.ai_available():
+                    raise ValueError("no trained AI model yet: run `python -m rl.train`")
+                from rl.policy import RLPolicy
+                try:
+                    self.rl = await asyncio.to_thread(RLPolicy.load, self.cfg)
+                except ImportError as exc:
+                    raise ValueError(f"AI needs the RL dependencies (torch, sb3-contrib): {exc}") from exc
+        return self.rl
+
+
 class SimSession:
-    def __init__(self, cfg: Config, log_runs: bool = True, runs_dir=None):
+    def __init__(self, cfg: Config, log_runs: bool = True, runs_dir=None, shared: SharedModels | None = None,
+                 private: bool = False):
+        """``private``: this session belongs to one visitor (public demo), so the analyst may only
+        look at runs made in it, never another visitor's."""
         self.base_cfg = cfg
+        self.shared = shared or SharedModels(cfg)
+        self.private = private
+        self.run_dirs: list = []  # every run log this session has opened (oldest first)
         self.log_runs = log_runs
         self.runs_dir = runs_dir
         self.clients: set[Client] = set()
@@ -232,11 +285,9 @@ class SimSession:
         self.controller = cfg.signals.controller  # the AI toggle: what drives the run outside a comparison
         self.last_error: str | None = None
         self._debt = 0.0
-        self._model = None        # the trained PPO network, loaded on first use (needs torch)
-        self._model_lock = asyncio.Lock()
         self.twin: LiveRun | None = None   # comparison mode: the AI run (main run = fixed timer)
         self.compare_id: str | None = None
-        self.forecaster = self._load_forecaster()
+        self.forecaster = self.shared.forecaster
         self.analyst = None  # server.analyst.AnalystService, attached by the app (Phase 12)
         if self.controller == "rl":
             # The model loads asynchronously (in a thread) and there is no event loop yet, so the
@@ -256,19 +307,7 @@ class SimSession:
 
     # ------------------------------------------------------------------ lifecycle
     def ai_available(self) -> bool:
-        return self.base_cfg.rl_model_path().is_file()
-
-    def _load_forecaster(self):
-        """The queue predictor, if one has been trained. It is small (a text file of trees) and
-        lightgbm imports quickly, so unlike the RL model it loads at start-up."""
-        if not self.base_cfg.predict_model_path().is_file():
-            return None
-        try:
-            from predict.forecaster import QueueForecaster
-            return QueueForecaster.load(self.base_cfg)
-        except Exception:  # no lightgbm, or a model from an older feature list: run without it
-            log.exception("queue predictor not loaded; the dashboard runs without forecasts")
-            return None
+        return self.shared.ai_available()
 
     def _attach_forecaster(self) -> None:
         """Forecast for the main run only, and not while comparing (see the module docstring)."""
@@ -277,23 +316,12 @@ class SimSession:
             self.twin.forecaster = None
 
     async def _ensure_model(self):
-        """Load the trained network once, in a worker thread (importing torch takes seconds and
-        must not freeze the stream for everyone)."""
-        async with self._model_lock:
-            if self._model is None:
-                if not self.ai_available():
-                    raise ValueError("no trained AI model yet: run `python -m rl.train`")
-                from rl.policy import RLPolicy
-                try:
-                    self._model = await asyncio.to_thread(RLPolicy.load, self.base_cfg)
-                except ImportError as exc:
-                    raise ValueError(f"AI needs the RL dependencies (torch, sb3-contrib): {exc}") from exc
-        return self._model
+        return await self.shared.ensure_rl()
 
     def _policy(self, controller: str, sim: Simulation):
         if controller == "rl":
             from rl.policy import RLPolicy
-            base = self._model
+            base = self.shared.rl
             # One network, but each sim gets its own policy: the decision clock is per sim.
             return RLPolicy(base.model, self.base_cfg.rl.decision_interval_s, model_id=base.model_id,
                             max_green_s=self.base_cfg.rl.max_green_s)
@@ -307,7 +335,10 @@ class SimSession:
         sim.policy = self._policy(controller, sim)
         sim.cfg.signals.controller = controller
         self._debt = 0.0
-        return LiveRun(sim, controller, self.log_runs, self.runs_dir, {"source": "dashboard", **(tags or {})})
+        run = LiveRun(sim, controller, self.log_runs, self.runs_dir, {"source": "dashboard", **(tags or {})})
+        if run.logger:
+            self.run_dirs.append(run.logger.dir)
+        return run
 
     def runs(self) -> list[LiveRun]:
         return [self.run] + ([self.twin] if self.twin else [])
@@ -318,6 +349,10 @@ class SimSession:
 
     def shutdown(self) -> None:
         self.close_run()
+
+    def own_runs(self) -> list[str]:
+        """Ids of this session's run logs still on disk, oldest first (short runs are discarded)."""
+        return [d.name for d in self.run_dirs if (d / "manifest.json").is_file()]
 
     # ------------------------------------------------------------------ settings & status
     def settings(self) -> dict:

@@ -1,0 +1,20 @@
+# Runtime dependencies of the public demo image only (the dashboard server, the RL agent, the
+# predictor and the analyst), pinned to the versions the project was built and tested with.
+# Not here: pytest, ragas/langchain (Phase 13 evaluation), which only run on a dev machine.
+# torch is installed separately in the Dockerfile from the CPU-only index (~200 MB instead of ~2 GB).
+numpy==2.5.4
+pydantic==2.14.3
+PyYAML==6.0.3
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+httpx==0.28.1
+matplotlib==3.11.2
+gymnasium==1.4.0
+stable-baselines3==2.9.2
+sb3-contrib==2.9.2
+lightgbm==4.7.0
+scipy==1.18.1
+pymupdf==2.1
+sentence-transformers==6.2.0
+chromadb==1.5.9
+rank-bm25==0.2.2

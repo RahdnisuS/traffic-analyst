@@ -123,6 +123,7 @@ class AnalystContext:
     capacity: str = ""
     previous_run_id: str | None = None
     now_s: float | None = None              # the live run's simulated time (for "the last minute")
+    allowed_runs: set[str] | None = None    # public demo: the only runs a question may name (None = any)
 
 
 class Analyst:
@@ -190,7 +191,7 @@ class Analyst:
         known = set(self.kb.state["runs"]) if self.kb is not None else set()
         if ref == "previous" and ctx.previous_run_id:
             return [ctx.previous_run_id]
-        if ref and ref in known:
+        if ref and ref in known and (ctx.allowed_runs is None or ref in ctx.allowed_runs):
             return [ref]
         return list(ctx.run_ids)
 

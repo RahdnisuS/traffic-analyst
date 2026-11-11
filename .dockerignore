@@ -1,0 +1,14 @@
+# Never in the image: secrets, the owner's copyrighted PDF (every local PDF; public ones are
+# downloaded and checksummed by deploy/fetch_docs.sh), local runs/indexes, caches, dev tools.
+.env
+.git
+.venv
+.claude
+.impeccable
+**/__pycache__
+.pytest_cache
+docs/**/*.pdf
+data/
+chroma/
+eval/work/
+skills-lock.json

@@ -6,14 +6,13 @@ __pycache__/
 # generated artefacts (kept out of git; regenerate from code)
 data/runs/
 chroma/
-rl/models/*.zip
 .claude/
 skills-lock.json
 .impeccable/
 
-# Phase 9: generated predictor dataset and trained model
+# Phase 9: generated predictor dataset (the trained models in rl/models/ and predict/models/ ARE
+# committed since Phase 14: small, and the demo image and a fresh clone need them)
 data/predictor_runs/
-predict/models/
 
 # Phase 11: PDFs for the knowledge base (most guidelines are copyrighted; rag/sources.yaml says where to get them)
 docs/**/*.pdf

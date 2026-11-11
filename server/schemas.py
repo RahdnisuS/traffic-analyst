@@ -77,10 +77,12 @@ class ChatTurn(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    """POST /api/chat. History is kept by the browser (chat is per user; the sim is shared)."""
+    """POST /api/chat. History is kept by the browser (chat is per user). ``session``: the browser
+    tab's session id, which picks the simulation "this run" means (ignored when the sim is shared)."""
     model_config = ConfigDict(extra="forbid")
     question: str = Field(..., min_length=1, max_length=1000)
     history: list[ChatTurn] = Field(default_factory=list, max_length=12)
+    session: str | None = Field(None, max_length=64)
 
 
 Command = Annotated[Union[PlayCmd, PauseCmd, SpeedCmd, ResetCmd, SettingsCmd, StressCmd, ControllerCmd,

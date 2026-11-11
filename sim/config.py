@@ -338,6 +338,17 @@ class AnalystSettings(_Strict):
     log_path: str = "data/analyst/log.jsonl"
 
 
+class ServerSettings(_Strict):
+    """Phase 14: how the dashboard server shares simulations and the analyst. Local use keeps one
+    shared sim (every browser sees and drives the same junction); the public demo
+    (deploy/public.yaml) gives each browser tab its own sim and limits questions per visitor."""
+    sessions: Literal["shared", "per_visitor"] = "shared"
+    max_sessions: int = Field(4, ge=1)            # per_visitor: simultaneous sims (CPU is the limit)
+    idle_close_s: float = Field(120.0, ge=0)      # per_visitor: keep a sim this long after its tab closes
+    keep_runs: bool = True                        # False: a closed visitor sim's run logs are deleted
+    chat_per_hour: int = Field(0, ge=0)           # analyst questions per visitor per hour; 0 = no limit
+
+
 class Config(_Strict):
     sim: SimSettings = SimSettings()
     vehicle_types: dict[str, VehicleTypeParams]
@@ -355,6 +366,7 @@ class Config(_Strict):
     experiments: ExperimentSettings = ExperimentSettings()
     rag: RAGSettings = RAGSettings()
     analyst: AnalystSettings = AnalystSettings()
+    server: ServerSettings = ServerSettings()
 
     @model_validator(mode="after")
     def _mix_types_exist(self) -> "Config":
@@ -406,8 +418,23 @@ class Config(_Strict):
         return p if p.is_absolute() else PROJECT_ROOT / p
 
 
-def load_config(path: str | Path = PROJECT_ROOT / "config.yaml") -> Config:
-    """Read and validate a YAML config file."""
+def _merge(base: dict, over: dict) -> dict:
+    """Deep merge: nested sections are merged key by key, anything else is replaced."""
+    out = dict(base)
+    for k, v in over.items():
+        out[k] = _merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+    return out
+
+
+def load_config(path: str | Path = PROJECT_ROOT / "config.yaml", overlay: str | Path | None = None) -> Config:
+    """Read and validate a YAML config file. ``overlay``: a second YAML file whose keys override the
+    first (the public demo's deploy/public.yaml), so a deployment changes only what differs and
+    config.yaml stays the single source of truth for everything else."""
     with open(path, encoding="utf-8") as fh:
         raw = yaml.safe_load(fh) or {}
+    if overlay:
+        op = Path(overlay)
+        op = op if op.is_absolute() else PROJECT_ROOT / op
+        with open(op, encoding="utf-8") as fh:
+            raw = _merge(raw, yaml.safe_load(fh) or {})
     return Config.model_validate(raw)

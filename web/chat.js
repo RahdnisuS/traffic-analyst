@@ -61,9 +61,10 @@ function fmtValue(key, v) {
 }
 
 export class Chat {
-  constructor(root, { send }) {
+  constructor(root, { send, session }) {
     this.root = root;
     this.send = send;
+    this.session = session;
     this.log = root.querySelector("#chat-log");
     this.form = root.querySelector("#chat-form");
     this.input = root.querySelector("#chat-input");
@@ -87,6 +88,9 @@ export class Chat {
     if (!ok) {
       note.textContent = `The analyst is unavailable: ${st?.reason ?? "the server did not report its status."}`;
       note.classList.add("unavailable");
+    } else if (st.per_hour && !note.dataset.limit) {
+      note.dataset.limit = "1";
+      note.append(` Public demo: up to ${st.per_hour} questions per hour.`);
     }
     this.input.disabled = this.button.disabled = !ok;
     for (const c of this.suggest.querySelectorAll(".chip")) c.disabled = !ok;
@@ -118,7 +122,7 @@ export class Chat {
     let res;
     try {
       const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q, history }) });
+        body: JSON.stringify({ question: q, history, session: this.session }) });
       res = r.ok ? await r.json() : { type: "error", message: `The server rejected the question (${r.status}).` };
     } catch {
       res = { type: "error", message: "Could not reach the server." };

@@ -1,0 +1,8 @@
+# Overrides for the public demo (Hugging Face Space). Loaded on top of config.yaml when the
+# environment variable TRAFFIC_OVERLAY=deploy/public.yaml is set (the Dockerfile sets it).
+server:
+  sessions: per_visitor   # strangers must not move each other's sliders
+  max_sessions: 4         # 2 shared vCPUs: each sim (twice that while comparing) costs a core-share
+  idle_close_s: 120
+  keep_runs: false        # visitors' runs are not kept (the disk is temporary anyway)
+  chat_per_hour: 10       # protects the free-tier Groq quota (~200k tokens/day, ~60 questions)

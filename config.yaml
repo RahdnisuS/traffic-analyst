@@ -320,3 +320,12 @@ analyst:
   max_answer_tokens: 900
   history_turns: 3        # earlier exchanges sent along, so follow-ups ("and at 4:00?") work
   log_path: data/analyst/log.jsonl   # every question, its sources and the answer (gitignored)
+
+# Phase 14: the dashboard server. Local use: one simulation shared by every browser. The public demo
+# overrides this with deploy/public.yaml (TRAFFIC_OVERLAY=deploy/public.yaml, set in the Dockerfile).
+server:
+  sessions: shared        # shared | per_visitor (each browser tab gets its own simulation)
+  max_sessions: 4         # per_visitor: simultaneous sims; later visitors are told the demo is busy
+  idle_close_s: 120       # per_visitor: a sim survives this long after its tab closes (a reload reconnects)
+  keep_runs: true         # false: a visitor's run logs are deleted when their sim closes
+  chat_per_hour: 0        # analyst questions per visitor (IP address) per hour; 0 = unlimited
